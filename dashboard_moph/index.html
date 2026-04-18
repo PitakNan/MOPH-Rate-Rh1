@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOPH Rates 2025 | Dashboard เขตสุขภาพที่ 1</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header class="animate-in">
+            <h1>รายงานบัญชีอัตราค่าบริการ 2568</h1>
+            <p>เขตสุขภาพที่ 1 | กระทรวงสาธารณสุข (Monitoring Dashboard)</p>
+        </header>
+
+        <!-- Monitoring Stats - Updated as requested -->
+        <div class="stats-grid animate-in">
+            <div class="stat-card">
+                <span class="stat-icon">🏥</span>
+                <div class="stat-value" id="total-units">0</div>
+                <div class="stat-label">หน่วยบริการทั้งหมด</div>
+            </div>
+            <div class="stat-card" style="border-bottom: 5px solid var(--success);">
+                <span class="stat-icon">✅</span>
+                <div class="stat-value" id="completed-units">0</div>
+                <div class="stat-label">เสร็จสิ้น (ผตร. อนุมัติ)</div>
+            </div>
+            <div class="stat-card" style="border-bottom: 5px solid var(--danger);">
+                <span class="stat-icon">🚫</span>
+                <div class="stat-value" id="noservice-units">0</div>
+                <div class="stat-label">เสร็จสิ้น (รับแจ้ง-ไม่มีบริการ)</div>
+            </div>
+            <div class="stat-card" style="border-bottom: 5px solid var(--warning);">
+                <span class="stat-icon">⏳</span>
+                <div class="stat-value" id="pending-units">0</div>
+                <div class="stat-label">อยู่ระหว่างดำเนินการ</div>
+            </div>
+        </div>
+
+        <!-- Province Summary Grid (Horizontal Layout) -->
+        <h2 class="animate-in" style="margin-bottom: 1.5rem; color: var(--primary);">📊 สรุปความคืบหน้ารายจังหวัด</h2>
+        <div class="province-grid animate-in" id="province-grid">
+            <!-- Province summary cards will be injected here -->
+        </div>
+
+        <!-- Navigation & Tools -->
+        <div class="filter-bar animate-in">
+            <div class="btn-group">
+                <a href="admin.html" class="btn btn-primary">➕ จัดการข้อมูล (Admin Panel)</a>
+                <button class="btn btn-secondary" onclick="exportToFile()">💾 สำรองข้อมูลล่าสุด (JSON)</button>
+            </div>
+        </div>
+
+        <!-- Search & Grid Content -->
+        <div class="data-wrapper animate-in">
+            <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                <input type="text" id="search-input" placeholder="🔍 ค้นชื่อหรือรหัสหน่วยงาน..."
+                    onkeyup="handleSearch()" style="flex: 2;">
+                <select id="status-filter" onchange="handleFilter()" style="flex: 1;">
+                    <option value="all">-- ทุกสถานะ --</option>
+                    <option value="0">0. รอการตรวจสอบ/ยังไม่ได้รับข้อมูล</option>
+                    <option value="1">1. หน่วยงานส่งข้อมูลแล้ว (อยู่ระหว่างตรวจ 7.1)</option>
+                    <option value="2">2. กบรส. อยู่ระหว่างการพิจารณา (7.2)</option>
+                    <option value="3">3. อยู่ระหว่างคณะกรรมการกลั่นกรองพิจารณา</option>
+                    <option value="4">4. เสนอผู้ตรวจราชการพิจารณาอนุมัติ</option>
+                    <option value="5">5. อนุมัติและดำเนินการเสร็จสิ้น</option>
+                    <option value="6">6. เสร็จสิ้น (ไม่มีการให้บริการ/รายการราคา)</option>
+                    <option value="7">7. แจ้งแก้ไข</option>
+                </select>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table id="units-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 10%;">รหัส</th>
+                            <th style="width: 30%;">ชื่อหน่วยบริการ</th>
+                            <th style="width: 15%;">จังหวัด</th>
+                            <th style="width: 25%;">สถานะล่าสุด</th>
+                            <th style="width: 10%;">ปรับปรุงเมื่อ</th>
+                            <th style="width: 10%;">ลิงก์</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Data will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
