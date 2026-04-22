@@ -61,6 +61,19 @@ function initDashboard() {
     updateStats();
     initProvinceCards();
     renderTable();
+
+    // Add event listeners for optimized search & filter
+    const searchInput = document.getElementById('search-input');
+    const statusFilter = document.getElementById('status-filter');
+    
+    if (searchInput) {
+        // Use debounce for typing to prevent lag
+        searchInput.addEventListener('input', debounce(() => renderTable(), 250));
+    }
+    if (statusFilter) {
+        // Immediate update for dropdown
+        statusFilter.addEventListener('change', () => renderTable());
+    }
 }
 
 function updateStats() {
@@ -130,30 +143,30 @@ function createProvCard(name, units, value) {
     return card;
 }
 
-function handleSearch() { renderTable(); }
-function handleFilter() { renderTable(); }
+function handleSearch() { /* Handled by event listeners in initDashboard with debounce */ }
+function handleFilter() { /* Handled by event listeners in initDashboard */ }
 
 function renderTable() {
     const tbody = document.getElementById('table-body');
     if (!tbody) return;
 
-    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
     const statusFilter = document.getElementById('status-filter').value;
     
     tbody.innerHTML = '';
     
     let filtered = allUnits.filter(u => {
         const matchProv = currentProvince === 'all' || u.province === currentProvince;
-        const matchSearch = u.name.toLowerCase().includes(searchTerm) || (u.code && u.code.includes(searchTerm));
+        const matchSearch = termMatches(u, searchTerm);
         const matchStatus = statusFilter === 'all' || u.status.toString() === statusFilter;
         return matchProv && matchSearch && matchStatus;
     });
 
-    // Sorting: 5 (Done), 1-4 (Pending), 6 (No Service), 0 (Initial)
+    // Sorting
     filtered.sort((a, b) => {
         const priority = (s) => {
             if (s == 5) return 10;
-            if (s == 7) return 8; // high priority within pending items
+            if (s == 7) return 8;
             if (s >= 1 && s <= 4) return s + 2;
             if (s == 6) return 1;
             return 0;
@@ -161,17 +174,22 @@ function renderTable() {
         return priority(b.status) - priority(a.status);
     });
 
-    filtered.forEach(u => {
+    // Batch DOM updates using DocumentFragment
+    const fragment = document.createDocumentFragment();
+    
+    // Performance: Limit initial render to 250 rows if searching (keeps UI fluid)
+    const displayLimit = searchTerm ? 250 : filtered.length;
+    const itemsToShow = filtered.slice(0, displayLimit);
+
+    itemsToShow.forEach(u => {
         const tr = document.createElement('tr');
         tr.className = 'animate-in';
         
         let rateHtml = '';
         if (u.status == 3 || u.rate_total > 0) {
-            // Support legacy and new fields
             const lThai = u.rate_lower_thai ?? u.rate_lower ?? 0;
             const eThai = u.rate_equal_thai ?? u.rate_equal ?? 0;
             const hThai = u.rate_higher_thai ?? u.rate_higher ?? 0;
-            
             const lInter = u.rate_lower_inter ?? 0;
             const eInter = u.rate_equal_inter ?? 0;
             const hInter = u.rate_higher_inter ?? u.rate_inter_higher ?? 0;
@@ -185,9 +203,7 @@ function renderTable() {
         }
 
         tr.innerHTML = `
-            <td>
-                <span class="unit-code" style="background:#e0f2f1; padding:4px 8px; border-radius:4px; font-size:0.9rem;">${u.code || '-'}</span>
-            </td>
+            <td><span class="unit-code" style="background:#e0f2f1; padding:4px 8px; border-radius:4px; font-size:0.9rem;">${u.code || '-'}</span></td>
             <td>
                 <span class="unit-name">${u.name}</span>
                 <span class="unit-type">${u.type || '-'}</span>
@@ -196,12 +212,42 @@ function renderTable() {
             <td><span style="font-weight: 700; color: var(--primary);">${u.province}</span></td>
             <td><span class="status-badge status-${u.status}">${getStatusText(u.status)}</span></td>
             <td style="font-weight: 600; color: var(--text-muted);">${u.updateDate || u.startDate || '-'}</td>
-            <td>
-                ${u.fileLink ? `<a href="${u.fileLink}" target="_blank" class="link-btn">🔗 ไฟล์</a>` : '-'}
-            </td>
+            <td>${u.fileLink ? `<a href="${u.fileLink}" target="_blank" class="link-btn">🔗 ไฟล์</a>` : '-'}</td>
         `;
-        tbody.appendChild(tr);
+        fragment.appendChild(tr);
     });
+
+    tbody.appendChild(fragment);
+
+    // If results were capped, add a note
+    if (filtered.length > displayLimit) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-muted);">
+            แสดงผล ${displayLimit} รายการแรกจากทั้งหมด ${filtered.length} รายการ (กรุณาพิมพ์เพื่อระบุหน่วยบริการที่เจาะจงมากขึ้น)
+        </td>`;
+        tbody.appendChild(tr);
+    }
+}
+
+// Utility: term matching
+function termMatches(u, term) {
+    if (!term) return true;
+    return u.name.toLowerCase().includes(term) || 
+           (u.code && u.code.includes(term)) ||
+           u.province.toLowerCase().includes(term);
+}
+
+// Utility: Debounce
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
 function getStatusText(s) {
@@ -234,27 +280,72 @@ function login() {
     }
 }
 
-function initAdmin(filterText = '') {
-    const datalist = document.getElementById('unit-options');
-    if (!datalist) return;
+function initAdmin() {
+    const input = document.getElementById('unit-select');
+    if (!input) return;
 
-    datalist.innerHTML = '';
+    // Handle typing in the search box
+    input.addEventListener('input', (e) => handleAdminSearch(e.target.value));
 
-    const sorted = [...allUnits].sort((a, b) => {
-        if (a.province !== b.province) return a.province.localeCompare(b.province, 'th');
-        return a.name.localeCompare(b.name, 'th');
+    // Handle clicking the input to show results if it has text
+    input.addEventListener('click', (e) => {
+        if (e.target.value.trim().length > 0) handleAdminSearch(e.target.value);
     });
 
-    sorted.forEach(u => {
-        const opt = document.createElement('option');
-        opt.value = u.name;
-        opt.textContent = `[รหัส: ${u.code || '---'}] ${u.name} (จ.${u.province})`;
-        datalist.appendChild(opt);
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const results = document.getElementById('search-results');
+        if (results && !input.contains(e.target) && !results.contains(e.target)) {
+            results.style.display = 'none';
+        }
     });
+
+    console.log('Admin search initialized with high-performance custom dropdown.');
 }
 
-function handleAdminSearch() {
-    // No longer needed with datalist, search is built-in
+function handleAdminSearch(query) {
+    const resultsContainer = document.getElementById('search-results');
+    if (!resultsContainer) return;
+
+    const term = query.toLowerCase().trim();
+    if (term.length === 0) {
+        resultsContainer.style.display = 'none';
+        return;
+    }
+
+    // High speed filtering with limit
+    const matches = allUnits.filter(u => 
+        u.name.toLowerCase().includes(term) || 
+        (u.code && u.code.includes(term)) ||
+        u.province.toLowerCase().includes(term)
+    ).slice(0, 20); // Limit to top 20 for performance
+
+    if (matches.length === 0) {
+        resultsContainer.innerHTML = '<div style="padding: 15px; color: #999; text-align: center;">❌ ไม่พบข้อมูลหน่วยบริการ</div>';
+    } else {
+        resultsContainer.innerHTML = matches.map(u => `
+            <div class="search-item" onclick="selectUnit('${u.name.replace(/'/g, "\\'")}')">
+                <div class="unit-info">
+                    <span class="unit-name-small">${u.name}</span>
+                    <span class="unit-meta-small">รหัส: ${u.code || '---'} | ${u.type || '-'}</span>
+                </div>
+                <div class="prov-tag">${u.province}</div>
+            </div>
+        `).join('');
+    }
+
+    resultsContainer.style.display = 'block';
+}
+
+function selectUnit(name) {
+    const input = document.getElementById('unit-select');
+    const resultsContainer = document.getElementById('search-results');
+    
+    input.value = name;
+    resultsContainer.style.display = 'none';
+    
+    // Trigger the loading of unit data
+    loadUnitData();
 }
 
 function loadUnitData() {
@@ -347,4 +438,47 @@ function exportToFile() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function importFromFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let content = e.target.result;
+            let data;
+            
+            // Handle both .js (with const initialData =) and pure .json
+            if (content.includes('const initialData =')) {
+                const jsonString = content.split('const initialData =')[1].trim().replace(/;$/, '');
+                data = JSON.parse(jsonString);
+            } else {
+                data = JSON.parse(content);
+            }
+
+            if (Array.isArray(data)) {
+                allUnits = data;
+                localStorage.setItem('moph_rates_db', JSON.stringify(allUnits));
+                alert('📥 กู้คืนข้อมูลสำเร็จ! (' + data.length + ' รายการ)');
+                
+                // Refresh UI
+                if (document.getElementById('total-units')) {
+                    updateStats();
+                    initProvinceCards();
+                    renderTable();
+                }
+                
+                // Reset file input for next use
+                event.target.value = '';
+            } else {
+                throw new Error('รูปแบบไฟล์ไม่ถูกต้อง');
+            }
+        } catch (err) {
+            console.error('Import error:', err);
+            alert('❌ ไม่สามารถกู้คืนข้อมูลได้: ตรวจสอบว่าเป็นไฟล์ที่ส่งออกจากระบบนี้เท่านั้น');
+        }
+    };
+    reader.readAsText(file);
 }
