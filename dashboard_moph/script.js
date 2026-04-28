@@ -1,104 +1,51 @@
 let allUnits = [];
 let currentProvince = 'all';
 
-// Google Apps Script API URL - ดึงข้อมูลจาก Google Sheet
-const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbxRA6nelIcu7EhHX7Et-aBLCr9tgQu00zYFz619ocKeFrvDTb__hfsXa08Q2ItW99Zd/exec';
-
-// Store data hash for comparison
-let lastDataHash = null;
-
-// Load data from Google Sheet
-async function loadDataFromGoogleSheet() {
-    try {
-        const response = await fetch(GOOGLE_SHEET_API);
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error('ไม่สามารถดึงข้อมูลจาก Google Sheet:', error);
-        // Fallback to localStorage if API fails
-        const localData = localStorage.getItem('moph_rates_db');
-        if (localData) {
-            console.log('ใช้ข้อมูลจาก LocalStorage');
-            return JSON.parse(localData);
-        }
-        return [];
-    }
-}
-
-// Calculate hash of data for change detection
-function calculateDataHash(data) {
-    return JSON.stringify(data).split('').reduce((a, b) => {
-        a = ((a << 5) - a) + b.charCodeAt(0);
-        return a & a;
-    }, 0).toString();
-}
-
-// Refresh data from Google Sheet periodically
-function startAutoRefresh() {
-    setInterval(async () => {
-        try {
-            const newData = await loadDataFromGoogleSheet();
-            if (newData && newData.length > 0) {
-                const newHash = calculateDataHash(newData);
-
-                if (newHash !== lastDataHash) {
-                    console.log('🔄 ตรวจพบการเปลี่ยนแปลงข้อมูล - อัปเดต Dashboard');
-                    allUnits = newData;
-                    localStorage.setItem('moph_rates_db', JSON.stringify(allUnits));
-                    lastDataHash = newHash;
-
-                    // Re-render dashboard
-                    if (document.getElementById('total-units')) {
-                        updateStats();
-                        initProvinceCards();
-                        renderTable();
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Auto-refresh error:', error);
-        }
-    }, 15000); // Check every 15 seconds
-}
-
 // Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    // Load from Google Sheet
-    const sheetData = await loadDataFromGoogleSheet();
-
-    if (sheetData && sheetData.length > 0) {
-        allUnits = sheetData;
-
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof initialData !== 'undefined') {
+        // Deep copy from data.js
+        allUnits = JSON.parse(JSON.stringify(initialData));
+        
         // Load and merge local modifications if any
         const localData = localStorage.getItem('moph_rates_db');
         if (localData) {
             const parsedLocal = JSON.parse(localData);
             allUnits.forEach(u => {
                 const localUnit = parsedLocal.find(l => l.name === u.name);
-                if (localUnit && localUnit.status > 0) {
-                    // Only merge if there are changes in localStorage
+                if (localUnit) {
+                    // Restore admin-editable progress properties
                     if (localUnit.status !== undefined) u.status = localUnit.status;
                     if (localUnit.startDate) u.startDate = localUnit.startDate;
                     if (localUnit.updateDate) u.updateDate = localUnit.updateDate;
                     if (localUnit.fileLink) u.fileLink = localUnit.fileLink;
+                    
+                    // ONLY restore rates if user modified the status, or specifically for 'สำนักงานสาธารณสุขจังหวัดลำพูน'
+                    if (localUnit.status > 0 || u.name === 'สำนักงานสาธารณสุขจังหวัดลำพูน') {
+                        if (localUnit.rate_total !== undefined) u.rate_total = localUnit.rate_total;
+                        
+                        u.rate_lower_thai = localUnit.rate_lower_thai ?? localUnit.rate_lower ?? u.rate_lower_thai;
+                        u.rate_equal_thai = localUnit.rate_equal_thai ?? localUnit.rate_equal ?? u.rate_equal_thai;
+                        u.rate_higher_thai = localUnit.rate_higher_thai ?? localUnit.rate_higher ?? u.rate_higher_thai;
+                        
+                        u.rate_lower_inter = localUnit.rate_lower_inter ?? u.rate_lower_inter;
+                        u.rate_equal_inter = localUnit.rate_equal_inter ?? u.rate_equal_inter;
+                        u.rate_higher_inter = localUnit.rate_higher_inter ?? localUnit.rate_inter_higher ?? u.rate_higher_inter;
+                    }
                 }
             });
             localStorage.setItem('moph_rates_db', JSON.stringify(allUnits));
-            console.log('✓ ดึงข้อมูล ' + allUnits.length + ' รายการจาก Google Sheet');
+            console.log('Merged ' + allUnits.length + ' units with LocalStorage progress.');
         } else {
-            console.log('✓ ดึงข้อมูล ' + allUnits.length + ' รายการจาก Google Sheet (ไม่มีข้อมูลท้องถิ่น)');
+            console.log('Loaded ' + allUnits.length + ' units from initial data.js.');
         }
     } else {
-        console.warn('ไม่มีข้อมูลจาก Google Sheet, กำลังใช้ LocalStorage');
         const localData = localStorage.getItem('moph_rates_db');
         if (localData) {
             allUnits = JSON.parse(localData);
-            console.log('✓ ดึงข้อมูล ' + allUnits.length + ' รายการจาก LocalStorage');
+            console.log('Loaded ' + allUnits.length + ' units strictly from LocalStorage.');
         }
     }
-
-    // Calculate initial hash
-    lastDataHash = calculateDataHash(allUnits);
 
     if (document.getElementById('total-units')) {
         initDashboard();
@@ -106,10 +53,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('unit-select')) {
         initAdmin();
     }
-
-    // Start auto-refresh
-    startAutoRefresh();
-    console.log('✓ Auto-refresh เปิดใช้งาน (ตรวจสอบทุก 15 วินาที)');
 });
 
 // --- Dashboard Logic ---
