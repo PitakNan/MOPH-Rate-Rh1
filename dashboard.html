@@ -768,7 +768,7 @@ tr:last-child td { border-bottom: none; }
       <div class="filters-bar">
         <div class="filter-group" style="flex:1;max-width:480px;">
           <span class="filter-label">&#127963;</span>
-          <input type="search" id="hosp-search" class="search-input-lg"
+          <input type="search" id="hosp-search-t2" class="search-input-lg"
                  placeholder="ค้นหาชื่อหน่วยบริการ หรือรหัส hcode...">
         </div>
       </div>
@@ -1359,7 +1359,7 @@ function initHospSearch() {
     });
   });
 
-  const input = document.getElementById('hosp-search');
+  const input = document.getElementById('hosp-search-t2');
   const dropdown = document.getElementById('hosp-dropdown-list');
 
   input.addEventListener('input', () => {
@@ -1392,7 +1392,7 @@ function selectHospital(hcode) {
   state.hospSelected = hcode;
   const h = idx.hospitalByHcode.get(hcode);
   document.getElementById('hosp-dropdown-list').style.display = 'none';
-  document.getElementById('hosp-search').value = h ? `${h.hcode} — ${h.name}` : hcode;
+  document.getElementById('hosp-search-t2').value = h ? `${h.hcode} — ${h.name}` : hcode;
 
   const info = document.getElementById('hosp-selected-info');
   info.style.display = 'block';
