@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard อัตราค่าบริการสาธารณสุข — เขตสุขภาพที่ 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary:   #1a6b9b;
+  --primary-dark: #145580;
+  --primary-light: #e8f4fb;
+  --accent:    #27ae60;
+  --warning:   #e67e22;
+  --danger:    #e74c3c;
+  --gray-50:   #f8f9fa;
+  --gray-100:  #f1f3f5;
+  --gray-200:  #e9ecef;
+  --gray-300:  #dee2e6;
+  --gray-400:  #ced4da;
+  --gray-500:  #adb5bd;
+  --gray-600:  #6c757d;
+  --gray-700:  #495057;
+  --gray-800:  #343a40;
+  --gray-900:  #212529;
+  --text:      #2c3e50;
+  --border:    #dde1e7;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+  --shadow:    0 2px 8px rgba(0,0,0,.12);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,.15);
+  --radius:    8px;
+  --radius-sm: 5px;
+}
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'Sarabun', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  color: var(--text);
+  background: #f0f4f8;
+  line-height: 1.6;
+}
+
+/* ===== LAYOUT ===== */
+#app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ===== HEADER ===== */
+#site-header {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  color: #fff;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,.2);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.back-link {
+  color: rgba(255,255,255,.8);
+  text-decoration: none;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: color .2s;
+}
+.back-link:hover { color: #fff; }
+
+.header-title {
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-sub {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: .75;
+  margin-left: 8px;
+}
+
+/* ===== NAV TABS ===== */
+#nav-tabs {
+  background: #fff;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  padding: 0 24px;
+  gap: 0;
+  position: sticky;
+  top: 60px;
+  z-index: 99;
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-btn {
+  padding: 14px 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-600);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--primary); background: var(--primary-light); }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+/* ===== MAIN CONTENT ===== */
+#main-content { flex: 1; padding: 24px; max-width: 1600px; margin: 0 auto; width: 100%; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ===== LOADING ===== */
+#loading-overlay {
+  position: fixed; inset: 0;
+  background: rgba(240,244,248,.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  gap: 16px;
+}
+#loading-overlay.hidden { display: none; }
+
+.spinner {
+  width: 44px; height: 44px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== CARDS ===== */
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+.card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-body { padding: 18px; }
+
+/* ===== STAT CARDS ===== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--primary);
+}
+.stat-card.accent::before { background: var(--accent); }
+.stat-card.warning::before { background: var(--warning); }
+.stat-card.info::before { background: #8e44ad; }
+
+.stat-label { font-size: 12px; color: var(--gray-600); font-weight: 500; margin-bottom: 6px; }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--primary); line-height: 1.1; }
+.stat-card.accent .stat-value { color: var(--accent); }
+.stat-card.warning .stat-value { color: var(--warning); }
+.stat-card.info .stat-value { color: #8e44ad; }
+.stat-sub { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+
+/* ===== CHART GRID ===== */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.chart-wrap { position: relative; height: 300px; padding: 10px 0; }
+.chart-wrap-tall { height: 420px; }
+
+/* ===== SECTION: OVERVIEW TABLE ===== */
+.overview-tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+/* ===== FILTERS BAR ===== */
+.filters-bar {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label { font-size: 12px; font-weight: 600; color: var(--gray-600); white-space: nowrap; }
+
+input[type=text], input[type=search], select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: #fff;
+  color: var(--text);
+  transition: border-color .2s, box-shadow .2s;
+}
+input[type=text]:focus, input[type=search]:focus, select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26,107,155,.12);
+}
+
+.search-input { width: 260px; }
+.search-input-lg { width: 360px; }
+
+/* ===== CHIPS ===== */
+.chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+  color: var(--gray-700);
+}
+.chip:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+.chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ===== TABLE ===== */
+.table-wrap {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  box-shadow: var(--shadow-sm);
+  max-height: calc(100vh - 340px);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+thead {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--gray-50);
+}
+
+th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--gray-700);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+th.num { text-align: right; }
+
+td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.code { font-family: 'Courier New', monospace; font-size: 12px; color: var(--gray-600); }
+
+tr:hover td { background: var(--primary-light); }
+tr:last-child td { border-bottom: none; }
+
+/* Price colors */
+.price-ok    { color: var(--accent); font-weight: 500; }
+.price-over  { color: var(--danger); font-weight: 600; }
+.price-none  { color: var(--gray-400); font-style: italic; font-size: 12px; }
+
+/* ===== DETAIL PANEL ===== */
+#detail-panel {
+  position: fixed;
+  right: 0; top: 60px; bottom: 0;
+  width: 420px;
+  background: #fff;
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 20px rgba(0,0,0,.1);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .3s ease;
+}
+#detail-panel.open { transform: translateX(0); }
+
+.panel-header {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--primary);
+  color: #fff;
+}
+.panel-header-content { flex: 1; }
+.panel-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.panel-sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+
+.panel-close {
+  background: rgba(255,255,255,.2);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-family: inherit;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+.panel-close:hover { background: rgba(255,255,255,.35); }
+
+.panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+
+.panel-section { margin-bottom: 18px; }
+.panel-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--gray-500);
+  margin-bottom: 8px;
+}
+
+.panel-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 13px;
+}
+.panel-stat-row:last-child { border-bottom: none; }
+.panel-stat-label { color: var(--gray-600); }
+.panel-stat-val { font-weight: 600; color: var(--text); }
+
+/* ===== HOSPITAL COMPARISON TAB ===== */
+.hospital-selector-wrap {
+  position: relative;
+}
+.hospital-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 380px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  display: none;
+}
+.hospital-dropdown.open { display: block; }
+
+.hosp-option {
+  padding: 9px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid var(--gray-100);
+  transition: background .15s;
+}
+.hosp-option:last-child { border-bottom: none; }
+.hosp-option:hover { background: var(--primary-light); }
+.hosp-option.selected { background: var(--primary-light); color: var(--primary); }
+.hosp-option-name { font-weight: 500; }
+.hosp-option-meta { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+
+.selected-hospitals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.selected-hosp-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.selected-hosp-tag button {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.8);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  transition: color .15s;
+}
+.selected-hosp-tag button:hover { color: #fff; }
+
+/* Toggle buttons */
+.toggle-group {
+  display: flex;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.toggle-btn {
+  padding: 6px 14px;
+  border: none;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: all .15s;
+  border-right: 1px solid var(--border);
+}
+.toggle-btn:last-child { border-right: none; }
+.toggle-btn.active { background: var(--primary); color: #fff; font-weight: 600; }
+.toggle-btn:hover:not(.active) { background: var(--gray-100); }
+
+/* Export button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all .15s;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-success { background: var(--accent); color: #fff; }
+.btn-success:hover { background: #219a52; }
+.btn-outline {
+  background: #fff;
+  color: var(--primary);
+  border: 1.5px solid var(--primary);
+}
+.btn-outline:hover { background: var(--primary-light); }
+
+/* ===== INFO BADGE ===== */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-primary { background: var(--primary-light); color: var(--primary); }
+.badge-success { background: #eafaf1; color: var(--accent); }
+.badge-warning { background: #fef5e7; color: var(--warning); }
+.badge-danger  { background: #fef2f2; color: var(--danger); }
+
+/* ===== COMPARISON TABLE ===== */
+.comp-table-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 380px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.comp-table th { background: var(--gray-50); }
+.comp-table th.hosp-col { background: var(--primary-light); color: var(--primary); min-width: 110px; }
+.comp-table th.avg-col  { background: #eafaf1; color: var(--accent); min-width: 90px; }
+
+/* ===== PROVINCE TABLE ===== */
+.prov-bar {
+  height: 12px;
+  background: var(--primary);
+  border-radius: 3px;
+  min-width: 4px;
+  transition: width .4s ease;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .chart-grid, .overview-tables { grid-template-columns: 1fr; }
+  #detail-panel { width: 100%; top: 0; }
+  .search-input-lg { width: 220px; }
+}
+
+/* ===== UTILITY ===== */
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.text-muted { color: var(--gray-500); font-size: 12px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-20 { margin-top: 20px; }
+.flex { display: flex; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.align-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.fw-600 { font-weight: 600; }
+.fs-12 { font-size: 12px; }
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--primary-light);
+}
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+.empty-state .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+/* Count badge in table footer */
+.table-footer {
+  padding: 8px 14px;
+  background: var(--gray-50);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--gray-600);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+</style>
+</head>
+
+<body>
+<div id="app">
+
+<!-- DATA SCRIPTS -->
+<script src="data/dim_section.js"></script>
+<script src="data/dim_subsection.js"></script>
+<script src="data/dim_item.js"></script>
+<script src="data/dim_hospital.js"></script>
+<script src="data/fact_price.js"></script>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div style="font-size:15px;font-weight:600;color:var(--primary)">กำลังโหลดข้อมูล...</div>
+  <div id="loading-msg" style="font-size:13px;color:var(--gray-600)">กรุณารอสักครู่</div>
+</div>
+
+<!-- HEADER -->
+<header id="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="back-link">&#8592; กลับหน้าหลัก</a>
+    <div style="width:1px;height:28px;background:rgba(255,255,255,.3)"></div>
+    <div class="header-title">
+      Dashboard อัตราค่าบริการสาธารณสุข
+      <span class="header-sub">เขตสุขภาพที่ 1 | กบรส.</span>
+    </div>
+    <div id="header-meta" style="font-size:12px;opacity:.75;white-space:nowrap"></div>
+  </div>
+</header>
+
+<!-- NOTICE BAR -->
+<div style="background:#fff8e1;border-bottom:1px solid #ffe082;padding:8px 24px;font-size:13px;color:#7b5800;display:flex;align-items:center;gap:8px;">
+  <span style="font-size:15px;">&#9432;</span>
+  <span>แสดงเฉพาะ <strong>หน่วยบริการที่ผ่านการอนุมัติและมีบัญชีรายการอัตราค่าบริการฯ</strong> เท่านั้น และแสดงเฉพาะ <strong>รายการที่มีราคาปรากฏ</strong> (ราคา &gt; 0) — รายการที่ไม่มีบริการหรือไม่มีราคาจะไม่แสดง</span>
+</div>
+
+<!-- NAV TABS -->
+<nav id="nav-tabs">
+  <button class="tab-btn active" data-tab="tab-overview">&#128200; ภาพรวม</button>
+  <button class="tab-btn" data-tab="tab-search">&#128269; ค้นหารายการ</button>
+  <button class="tab-btn" data-tab="tab-compare">&#9878; เปรียบเทียบหน่วยบริการ</button>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main id="main-content">
+
+  <!-- ========== TAB 1: OVERVIEW ========== -->
+  <div id="tab-overview" class="tab-panel active">
+
+    <div class="stats-grid" id="stat-cards">
+      <div class="stat-card">
+        <div class="stat-label">หน่วยบริการทั้งหมด</div>
+        <div class="stat-value" id="st-total-hosp">—</div>
+        <div class="stat-sub">แห่ง ในเขตสุขภาพที่ 1</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-label">ยื่นอัตราค่าบริการ (รอบ 1/2569)</div>
+        <div class="stat-value" id="st-submitted-2569">—</div>
+        <div class="stat-sub">แห่ง</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-label">ยื่นอัตราค่าบริการ (รอบ 1/2568)</div>
+        <div class="stat-value" id="st-submitted-2568">—</div>
+        <div class="stat-sub">แห่ง</div>
+      </div>
+      <div class="stat-card info">
+        <div class="stat-label">รายการบริการ (CODE MOPH)</div>
+        <div class="stat-value" id="st-items">—</div>
+        <div class="stat-sub">รายการ</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">ราคาที่ยื่น ทั้งหมด (2569)</div>
+        <div class="stat-value" id="st-prices-2569">—</div>
+        <div class="stat-sub">แถวข้อมูล</div>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="card">
+        <div class="card-header">&#127961; การยื่นแยกตามจังหวัด (1/2569)</div>
+        <div class="card-body">
+          <div class="chart-wrap chart-wrap-tall">
+            <canvas id="chart-province"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">&#127970; การยื่นแยกตามระดับหน่วยบริการ</div>
+        <div class="card-body">
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="chart-level"></canvas>
+          </div>
+          <div class="mt-16">
+            <div class="card-header" style="border:none;padding:0 0 8px 0;font-size:13px">&#128202; สัดส่วนการยื่นแต่ละรอบ</div>
+            <div class="chart-wrap" style="height:180px">
+              <canvas id="chart-rounds"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="overview-tables">
+      <div class="card">
+        <div class="card-header">&#128203; สถิติรายจังหวัด</div>
+        <div class="table-wrap" style="max-height:320px">
+          <table id="prov-table">
+            <thead>
+              <tr>
+                <th>จังหวัด</th>
+                <th class="num">รพ.ทั้งหมด</th>
+                <th class="num">ยื่น 2568</th>
+                <th class="num">ยื่น 2569</th>
+                <th style="width:120px">สัดส่วน 2569</th>
+              </tr>
+            </thead>
+            <tbody id="prov-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">&#128203; สถิติรายระดับหน่วยบริการ</div>
+        <div class="table-wrap" style="max-height:320px">
+          <table id="level-table">
+            <thead>
+              <tr>
+                <th>ระดับ</th>
+                <th class="num">รพ.ทั้งหมด</th>
+                <th class="num">ยื่น 2568</th>
+                <th class="num">ยื่น 2569</th>
+                <th class="num">% 2569</th>
+              </tr>
+            </thead>
+            <tbody id="level-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-overview -->
+
+  <!-- ========== TAB 2: ITEM SEARCH ========== -->
+  <div id="tab-search" class="tab-panel">
+
+    <!-- Mode Toggle -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="toggle-btn active" id="mode-item-btn" onclick="setSearchMode('item')">&#128269; ค้นหารายการ</button>
+      <button class="toggle-btn" id="mode-hosp-btn" onclick="setSearchMode('hospital')">&#127963; ค้นหาหน่วยบริการ</button>
+    </div>
+
+    <!-- ITEM MODE FILTERS -->
+    <div id="item-mode-filters">
+      <div class="filters-bar">
+        <div class="filter-group">
+          <span class="filter-label">&#128269;</span>
+          <input type="search" id="item-search" class="search-input-lg"
+                 placeholder="ค้นหา CODE MOPH หรือชื่อรายการ...">
+        </div>
+        <div id="section-chips" class="chip-group"></div>
+      </div>
+    </div>
+
+    <!-- HOSPITAL MODE FILTERS -->
+    <div id="hosp-mode-filters" style="display:none;">
+      <div class="filters-bar">
+        <div class="filter-group" style="flex:1;max-width:480px;">
+          <span class="filter-label">&#127963;</span>
+          <input type="search" id="hosp-search" class="search-input-lg"
+                 placeholder="ค้นหาชื่อหน่วยบริการ หรือรหัส hcode...">
+        </div>
+      </div>
+      <div id="hosp-dropdown-list" style="display:none;position:absolute;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);max-height:280px;overflow-y:auto;z-index:50;width:480px;margin-top:2px;"></div>
+      <div id="hosp-selected-info" style="display:none;background:#e8f4fb;border:1px solid #1a6b9b33;border-radius:var(--radius);padding:10px 16px;margin-top:8px;font-size:14px;"></div>
+      <div class="filters-bar" style="margin-top:8px;">
+        <div id="hosp-section-chips" class="chip-group"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div id="search-results-info" class="text-muted"></div>
+      <button id="btn-export-search" class="btn btn-success" style="font-size:13px;padding:6px 14px;" onclick="exportSearchCSV()">&#8595; Export CSV</button>
+    </div>
+
+    <!-- ITEM MODE TABLE -->
+    <div id="item-mode-table" class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2">CODE MOPH</th>
+            <th rowspan="2">ชื่อรายการ</th>
+            <th rowspan="2">หมวด</th>
+            <th rowspan="2">หน่วย</th>
+            <th colspan="4" class="num group-header" style="background:#e8f4fb;border-bottom:2px solid #1a6b9b;">ราคาคนไทย</th>
+            <th colspan="4" class="num group-header" style="background:#fef9e7;border-bottom:2px solid #e67e22;">ราคาต่างชาติ</th>
+            <th rowspan="2" class="num">จำนวน รพ.</th>
+          </tr>
+          <tr>
+            <th class="num" style="background:#e8f4fb;">เพดาน</th>
+            <th class="num" style="background:#e8f4fb;">เฉลี่ยเขต</th>
+            <th class="num" style="background:#e8f4fb;">ต่ำสุด</th>
+            <th class="num" style="background:#e8f4fb;">สูงสุด</th>
+            <th class="num" style="background:#fef9e7;">เพดาน</th>
+            <th class="num" style="background:#fef9e7;">เฉลี่ยเขต</th>
+            <th class="num" style="background:#fef9e7;">ต่ำสุด</th>
+            <th class="num" style="background:#fef9e7;">สูงสุด</th>
+          </tr>
+        </thead>
+        <tbody id="search-tbody"></tbody>
+      </table>
+      <div class="table-footer" id="search-footer">— รายการ</div>
+    </div>
+
+    <!-- HOSPITAL MODE TABLE -->
+    <div id="hosp-mode-table" class="table-wrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2">CODE MOPH</th>
+            <th rowspan="2">ชื่อรายการ</th>
+            <th rowspan="2">หมวด</th>
+            <th rowspan="2">หน่วย</th>
+            <th colspan="5" class="num group-header" style="background:#e8f4fb;border-bottom:2px solid #1a6b9b;">ราคาคนไทย</th>
+            <th colspan="5" class="num group-header" style="background:#fef9e7;border-bottom:2px solid #e67e22;">ราคาต่างชาติ</th>
+          </tr>
+          <tr>
+            <th class="num" style="background:#e8f4fb;">เพดาน</th>
+            <th class="num" style="background:#dbeeff;font-weight:700;">ราคาที่กำหนด</th>
+            <th class="num" style="background:#e8f4fb;">เฉลี่ยกลุ่ม</th>
+            <th class="num" style="background:#e8f4fb;">เฉลี่ยจังหวัด</th>
+            <th class="num" style="background:#e8f4fb;">เฉลี่ยเขต</th>
+            <th class="num" style="background:#fef9e7;">เพดาน</th>
+            <th class="num" style="background:#fff3cd;font-weight:700;">ราคาที่กำหนด</th>
+            <th class="num" style="background:#fef9e7;">เฉลี่ยกลุ่ม</th>
+            <th class="num" style="background:#fef9e7;">เฉลี่ยจังหวัด</th>
+            <th class="num" style="background:#fef9e7;">เฉลี่ยเขต</th>
+          </tr>
+        </thead>
+        <tbody id="hosp-tbody"></tbody>
+      </table>
+      <div class="table-footer" id="hosp-footer">— เลือกหน่วยบริการเพื่อดูข้อมูล</div>
+    </div>
+
+    <!-- DETAIL PANEL OVERLAY -->
+    <div id="detail-overlay" onclick="closeDetailPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:89;"></div>
+
+    <!-- DETAIL PANEL -->
+    <div id="detail-panel">
+      <div class="panel-header">
+        <div class="panel-header-content">
+          <div class="panel-title" id="panel-item-name">—</div>
+          <div class="panel-sub" id="panel-item-code">—</div>
+        </div>
+        <button class="panel-close" onclick="closeDetailPanel()" title="ปิด">&#10005;</button>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+    </div>
+
+  </div><!-- /tab-search -->
+
+  <!-- ========== TAB 3: COMPARE ========== -->
+  <div id="tab-compare" class="tab-panel">
+
+    <div class="filters-bar" style="flex-direction:column;align-items:flex-start;gap:14px">
+
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;width:100%">
+        <!-- Hospital selector -->
+        <div class="filter-group" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <span class="filter-label">&#127970; เลือกหน่วยบริการ (สูงสุด 10 แห่ง)</span>
+          <div class="hospital-selector-wrap">
+            <input type="search" id="hosp-search" class="search-input" style="width:300px"
+                   placeholder="พิมพ์ชื่อ รพ. หรือรหัส...">
+            <div id="hosp-dropdown" class="hospital-dropdown"></div>
+          </div>
+        </div>
+
+        <!-- Price type -->
+        <div class="filter-group" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <span class="filter-label">ประเภทราคา</span>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-price-type="thai">คนไทย</button>
+            <button class="toggle-btn" data-price-type="foreign">ต่างชาติ</button>
+          </div>
+        </div>
+
+        <!-- Section filter -->
+        <div class="filter-group" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <span class="filter-label">หมวด</span>
+          <select id="comp-section-select" style="min-width:160px">
+            <option value="">ทุกหมวด</option>
+          </select>
+        </div>
+
+        <!-- Search within -->
+        <div class="filter-group" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <span class="filter-label">ค้นหาในผลลัพธ์</span>
+          <input type="search" id="comp-item-search" class="search-input"
+                 placeholder="ชื่อรายการ / CODE...">
+        </div>
+
+        <div class="filter-group" style="margin-left:auto;padding-top:20px">
+          <button class="btn btn-success" id="btn-export-csv">&#8595; Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Selected hospitals tags -->
+      <div id="selected-hospitals" class="selected-hospitals"></div>
+    </div>
+
+    <div id="comp-empty" class="empty-state">
+      <div class="empty-icon">&#9878;</div>
+      <div>เลือกหน่วยบริการเพื่อเปรียบเทียบอัตราค่าบริการ</div>
+      <div class="text-muted mt-12">ค้นหาและเลือก รพ. จากช่องด้านบน (สูงสุด 10 แห่ง)</div>
+    </div>
+
+    <div id="comp-table-container" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div id="comp-info" class="text-muted"></div>
+        <div id="comp-legend" style="display:flex;gap:12px;font-size:12px">
+          <span><span style="color:var(--accent);font-weight:600">&#9632;</span> &#8804; เพดาน</span>
+          <span><span style="color:var(--danger);font-weight:600">&#9632;</span> &gt; เพดาน</span>
+          <span><span style="color:var(--gray-400)">&#9632;</span> ไม่มีบริการ</span>
+        </div>
+      </div>
+      <div class="comp-table-wrap">
+        <table class="comp-table">
+          <thead id="comp-thead"></thead>
+          <tbody id="comp-tbody"></tbody>
+        </table>
+        <div class="table-footer" id="comp-footer"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-compare -->
+
+</main>
+</div><!-- /app -->
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+'use strict';
+
+/* ===================================================
+   GLOBALS & STATE
+   =================================================== */
+const state = {
+  searchMode: 'item',       // 'item' | 'hospital'
+  searchSection: '',
+  searchQuery: '',
+  hospSelected: null,       // hcode of selected hospital
+  hospSection: '',
+  compPriceType: 'thai',
+  compSection: '',
+  compQuery: '',
+  selectedHosps: [],
+  currentDetailCode: null,
+};
+
+/* Indexes */
+const idx = {
+  priceByKey: new Map(),          // `${hcode}|${code}` → [price_thai, price_foreign, year, round] (latest only)
+  pricesByItem: new Map(),        // `${code}` → Map<hcode, [pt, pf, year, round]> (latest per hcode)
+  hospitalByHcode: new Map(),     // hcode → hosp obj
+  itemByCode: new Map(),          // code_moph → item arr
+  hospitalsByProvince: new Map(), // province → [hcodes]
+  hospitalsByLevel: new Map(),    // level → [hcodes]
+  submittedByYear: new Map(),     // year → Set of hcodes (for overview tab only)
+  sectionByCode: new Map(),       // section_code → section obj
+};
+
+let chartProvince, chartLevel, chartRounds;
+
+/* ===================================================
+   INIT — build indexes
+   =================================================== */
+function init() {
+  setLoadingMsg('กำลังสร้าง index โรงพยาบาล...');
+
+  setTimeout(() => {
+    // Hospital indexes
+    for (const h of DIM_HOSPITAL) {
+      idx.hospitalByHcode.set(h.hcode, h);
+      if (!idx.hospitalsByProvince.has(h.province))
+        idx.hospitalsByProvince.set(h.province, []);
+      idx.hospitalsByProvince.get(h.province).push(h.hcode);
+      if (!idx.hospitalsByLevel.has(h.level))
+        idx.hospitalsByLevel.set(h.level, []);
+      idx.hospitalsByLevel.get(h.level).push(h.hcode);
+    }
+
+    // Section index
+    for (const s of DIM_SECTION) idx.sectionByCode.set(s.code, s);
+
+    // Item index
+    for (const item of DIM_ITEM) idx.itemByCode.set(item[0], item);
+
+    setLoadingMsg('กำลังสร้าง index ราคา...');
+
+    setTimeout(() => {
+      // Price indexes — keep only latest price per hcode+code (highest year, then highest round)
+      for (const row of FACT_PRICE) {
+        const [hcode, code, year, round, pt, pf] = row;
+
+        // submittedByYear — for overview tab informational charts only
+        if ((pt > 0) || (pf > 0)) {
+          if (!idx.submittedByYear.has(year)) idx.submittedByYear.set(year, new Set());
+          idx.submittedByYear.get(year).add(hcode);
+        }
+
+        // priceByKey — keep latest price per hcode+code
+        const key = `${hcode}|${code}`;
+        const existing = idx.priceByKey.get(key);
+        if (!existing || year > existing[2] || (year === existing[2] && round > existing[3])) {
+          idx.priceByKey.set(key, [pt, pf, year, round]);
+        }
+
+        // pricesByItem — keep latest per hcode, merged across all years/rounds
+        const ikey = code;
+        if (!idx.pricesByItem.has(ikey)) idx.pricesByItem.set(ikey, new Map());
+        const hospMap = idx.pricesByItem.get(ikey);
+        const existingH = hospMap.get(hcode);
+        if (!existingH || year > existingH[2] || (year === existingH[2] && round > existingH[3])) {
+          hospMap.set(hcode, [pt, pf, year, round]);
+        }
+      }
+
+      document.getElementById('loading-overlay').classList.add('hidden');
+      renderAll();
+    }, 20);
+  }, 20);
+}
+
+function setLoadingMsg(msg) {
+  document.getElementById('loading-msg').textContent = msg;
+}
+
+/* ===================================================
+   TAB NAVIGATION
+   =================================================== */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    closeDetailPanel();
+  });
+});
+
+/* ===================================================
+   RENDER ALL
+   =================================================== */
+function renderAll() {
+  renderOverview();
+  renderSearchTab();
+  renderCompareTab();
+  updateHeaderMeta();
+}
+
+function updateHeaderMeta() {
+  const sub2569 = idx.submittedByYear.get(2569)?.size ?? 0;
+  document.getElementById('header-meta').textContent =
+    `ข้อมูล ณ รอบ 1/2569 | ยื่น ${sub2569} แห่ง`;
+}
+
+/* ===================================================
+   TAB 1: OVERVIEW
+   =================================================== */
+function renderOverview() {
+  const total = DIM_HOSPITAL.length;
+  const sub2569 = idx.submittedByYear.get(2569)?.size ?? 0;
+  const sub2568 = idx.submittedByYear.get(2568)?.size ?? 0;
+  const items = DIM_ITEM.length;
+  const prices2569 = FACT_PRICE.filter(r => r[2] === 2569).length;
+
+  setEl('st-total-hosp', fmt(total));
+  setEl('st-submitted-2569', fmt(sub2569));
+  setEl('st-submitted-2568', fmt(sub2568));
+  setEl('st-items', fmt(items));
+  setEl('st-prices-2569', fmt(prices2569));
+
+  renderProvinceTable();
+  renderLevelTable();
+  renderCharts();
+}
+
+function renderProvinceTable() {
+  const provinces = [...idx.hospitalsByProvince.keys()].sort();
+  const sub2569 = idx.submittedByYear.get(2569) ?? new Set();
+  const sub2568 = idx.submittedByYear.get(2568) ?? new Set();
+  const maxSub = Math.max(...provinces.map(p => {
+    return (idx.hospitalsByProvince.get(p) || []).filter(h => sub2569.has(h)).length;
+  }));
+
+  const tbody = document.getElementById('prov-tbody');
+  tbody.innerHTML = provinces.map(prov => {
+    const hcodes = idx.hospitalsByProvince.get(prov) || [];
+    const n = hcodes.length;
+    const s69 = hcodes.filter(h => sub2569.has(h)).length;
+    const s68 = hcodes.filter(h => sub2568.has(h)).length;
+    const pct = n > 0 ? Math.round(s69 / n * 100) : 0;
+    const barW = maxSub > 0 ? Math.round(s69 / maxSub * 100) : 0;
+    return `<tr>
+      <td>${prov}</td>
+      <td class="num">${n}</td>
+      <td class="num">${s68}</td>
+      <td class="num"><strong>${s69}</strong></td>
+      <td><span class="prov-bar" style="width:${barW}px"></span> <span class="fs-12 text-muted">${pct}%</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderLevelTable() {
+  const levels = [...idx.hospitalsByLevel.keys()].sort();
+  const sub2569 = idx.submittedByYear.get(2569) ?? new Set();
+  const sub2568 = idx.submittedByYear.get(2568) ?? new Set();
+
+  const tbody = document.getElementById('level-tbody');
+  tbody.innerHTML = levels.map(lv => {
+    const hcodes = idx.hospitalsByLevel.get(lv) || [];
+    const n = hcodes.length;
+    const s69 = hcodes.filter(h => sub2569.has(h)).length;
+    const s68 = hcodes.filter(h => sub2568.has(h)).length;
+    const pct = n > 0 ? Math.round(s69 / n * 100) : 0;
+    return `<tr>
+      <td>${lv || '(ไม่ระบุ)'}</td>
+      <td class="num">${n}</td>
+      <td class="num">${s68}</td>
+      <td class="num"><strong>${s69}</strong></td>
+      <td class="num"><span class="badge badge-${pct >= 80 ? 'success' : pct >= 50 ? 'warning' : 'danger'}">${pct}%</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCharts() {
+  const provinces = [...idx.hospitalsByProvince.keys()].sort();
+  const sub2569 = idx.submittedByYear.get(2569) ?? new Set();
+  const sub2568 = idx.submittedByYear.get(2568) ?? new Set();
+
+  /* Province bar chart */
+  const provData2569 = provinces.map(p =>
+    (idx.hospitalsByProvince.get(p) || []).filter(h => sub2569.has(h)).length);
+  const provData2568 = provinces.map(p =>
+    (idx.hospitalsByProvince.get(p) || []).filter(h => sub2568.has(h)).length);
+
+  if (chartProvince) chartProvince.destroy();
+  chartProvince = new Chart(document.getElementById('chart-province'), {
+    type: 'bar',
+    data: {
+      labels: provinces,
+      datasets: [
+        { label: '1/2569', data: provData2569, backgroundColor: '#1a6b9b', borderRadius: 4 },
+        { label: '1/2568', data: provData2568, backgroundColor: '#e67e22', borderRadius: 4 },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { family: 'Sarabun', size: 12 } } } },
+      scales: {
+        x: { grid: { color: '#f0f0f0' }, ticks: { font: { family: 'Sarabun', size: 11 } } },
+        y: { ticks: { font: { family: 'Sarabun', size: 11 } } }
+      }
+    }
+  });
+
+  /* Level bar chart */
+  const levels = [...idx.hospitalsByLevel.keys()].sort();
+  const lvData = levels.map(l =>
+    (idx.hospitalsByLevel.get(l) || []).filter(h => sub2569.has(h)).length);
+  const lvTotal = levels.map(l => (idx.hospitalsByLevel.get(l) || []).length);
+
+  if (chartLevel) chartLevel.destroy();
+  chartLevel = new Chart(document.getElementById('chart-level'), {
+    type: 'bar',
+    data: {
+      labels: levels,
+      datasets: [
+        { label: 'ยื่นแล้ว', data: lvData, backgroundColor: '#27ae60', borderRadius: 4 },
+        { label: 'ยังไม่ยื่น', data: lvTotal.map((t, i) => t - lvData[i]), backgroundColor: '#dee2e6', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { font: { family: 'Sarabun', size: 12 } } } },
+      scales: {
+        x: { stacked: true, ticks: { font: { family: 'Sarabun', size: 11 } } },
+        y: { stacked: true, grid: { color: '#f0f0f0' }, ticks: { font: { family: 'Sarabun', size: 11 } } }
+      }
+    }
+  });
+
+  /* Rounds donut */
+  if (chartRounds) chartRounds.destroy();
+  chartRounds = new Chart(document.getElementById('chart-rounds'), {
+    type: 'doughnut',
+    data: {
+      labels: ['ยื่นทั้ง 2 รอบ', 'ยื่นเฉพาะ 2569', 'ยื่นเฉพาะ 2568', 'ไม่ยื่น'],
+      datasets: [{
+        data: (() => {
+          const all = DIM_HOSPITAL.map(h => h.hcode);
+          const both = all.filter(h => sub2569.has(h) && sub2568.has(h)).length;
+          const only69 = all.filter(h => sub2569.has(h) && !sub2568.has(h)).length;
+          const only68 = all.filter(h => !sub2569.has(h) && sub2568.has(h)).length;
+          const none = all.filter(h => !sub2569.has(h) && !sub2568.has(h)).length;
+          return [both, only69, only68, none];
+        })(),
+        backgroundColor: ['#1a6b9b', '#27ae60', '#e67e22', '#dee2e6'],
+        borderWidth: 2,
+        borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { family: 'Sarabun', size: 11 }, boxWidth: 14, padding: 10 }
+        }
+      }
+    }
+  });
+}
+
+/* ===================================================
+   TAB 2: ITEM SEARCH
+   =================================================== */
+/* ===================================================
+   SEARCH MODE TOGGLE
+   =================================================== */
+function setSearchMode(mode) {
+  state.searchMode = mode;
+  document.getElementById('mode-item-btn').classList.toggle('active', mode === 'item');
+  document.getElementById('mode-hosp-btn').classList.toggle('active', mode === 'hospital');
+  document.getElementById('item-mode-filters').style.display  = mode === 'item' ? '' : 'none';
+  document.getElementById('hosp-mode-filters').style.display  = mode === 'hospital' ? '' : 'none';
+  document.getElementById('item-mode-table').style.display    = mode === 'item' ? '' : 'none';
+  document.getElementById('hosp-mode-table').style.display    = mode === 'hospital' ? '' : 'none';
+}
+
+function renderSearchTab() {
+  // Build section chips (item mode)
+  const chipContainer = document.getElementById('section-chips');
+  chipContainer.innerHTML =
+    `<button class="chip active" data-section="">ทุกหมวด</button>` +
+    DIM_SECTION.sort((a, b) => a.order - b.order).map(s =>
+      `<button class="chip" data-section="${s.code}">${s.code} — ${s.name}</button>`
+    ).join('');
+
+  chipContainer.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chipContainer.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      state.searchSection = chip.dataset.section;
+      renderSearchResults();
+    });
+  });
+
+  // Search input
+  let searchTimer;
+  document.getElementById('item-search').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.searchQuery = e.target.value.trim().toLowerCase();
+      renderSearchResults();
+    }, 200);
+  });
+
+  renderSearchResults();
+  initHospSearch();
+}
+
+function renderSearchResults() {
+  const { searchSection, searchQuery } = state;
+
+  // Filter items
+  let items = DIM_ITEM;
+  if (searchSection) items = items.filter(it => it[1] === searchSection);
+  if (searchQuery) {
+    items = items.filter(it =>
+      it[0].toLowerCase().includes(searchQuery) ||
+      it[4].toLowerCase().includes(searchQuery)
+    );
+  }
+
+  // Limit display for performance
+  const MAX_ROWS = 500;
+  const total = items.length;
+  const displayItems = items.slice(0, MAX_ROWS);
+
+  const tbody = document.getElementById('search-tbody');
+  tbody.innerHTML = displayItems.map(item => {
+    const code = item[0];
+    const section = idx.sectionByCode.get(item[1]);
+    const sectionLabel = section ? `<span class="badge badge-primary">${item[1]}</span>` : item[1];
+    const ceilThai = item[6] > 0 ? item[6] : null;
+    const ceilForeign = item[7] > 0 ? item[7] : null;
+
+    // pricesByItem is now Map<hcode, [pt, pf, year, round]>
+    const hospMap = idx.pricesByItem.get(code);
+    const thaiPrices = hospMap
+      ? [...hospMap.values()].map(v => v[0]).filter(p => p > 0)
+      : [];
+    const count = thaiPrices.length;
+
+    const avgThai = count > 0 ? thaiPrices.reduce((a, b) => a + b, 0) / count : null;
+    const mnThai  = count > 0 ? Math.min(...thaiPrices) : null;
+    const mxThai  = count > 0 ? Math.max(...thaiPrices) : null;
+
+    const foreignPrices = hospMap ? [...hospMap.values()].map(v => v[1]).filter(p => p > 0) : [];
+    const cntF = foreignPrices.length;
+    const avgForeign = cntF > 0 ? foreignPrices.reduce((a, b) => a + b, 0) / cntF : null;
+    const mnForeign  = cntF > 0 ? Math.min(...foreignPrices) : null;
+    const mxForeign  = cntF > 0 ? Math.max(...foreignPrices) : null;
+
+    const d = (v, bg='') => v !== null
+      ? `<td class="num"${bg}>${fmtPrice(v)}</td>`
+      : `<td class="num"${bg}><span class="text-muted">—</span></td>`;
+    const bt = ' style="background:#f5fbff;"';
+    const bf = ' style="background:#fffdf0;"';
+
+    return `<tr style="cursor:pointer" onclick="openDetailPanel('${esc(code)}')">
+      <td class="code">${esc(code)}</td>
+      <td>${esc(item[4])}</td>
+      <td>${sectionLabel}</td>
+      <td class="fs-12 text-muted">${esc(item[5] || '')}</td>
+      ${d(ceilThai,bt)}${d(avgThai,bt)}${d(mnThai,bt)}${d(mxThai,bt)}
+      ${d(ceilForeign,bf)}${d(avgForeign,bf)}${d(mnForeign,bf)}${d(mxForeign,bf)}
+      <td class="num"><span class="badge badge-${count > 0 ? 'primary' : 'warning'}">${count}</span></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="13" class="empty-state">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>`;
+
+  document.getElementById('search-footer').textContent =
+    `แสดง ${Math.min(total, MAX_ROWS).toLocaleString()} จาก ${total.toLocaleString()} รายการ`;
+}
+
+/* ===================================================
+   HOSPITAL SEARCH MODE
+   =================================================== */
+function initHospSearch() {
+  // Build section chips for hospital mode
+  const chipContainer = document.getElementById('hosp-section-chips');
+  chipContainer.innerHTML =
+    `<button class="chip active" data-hsection="">ทุกหมวด</button>` +
+    DIM_SECTION.sort((a,b) => a.order - b.order).map(s =>
+      `<button class="chip" data-hsection="${s.code}">${s.code} — ${s.name}</button>`
+    ).join('');
+  chipContainer.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chipContainer.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      state.hospSection = chip.dataset.hsection;
+      if (state.hospSelected) renderHospResults(state.hospSelected);
+    });
+  });
+
+  const input = document.getElementById('hosp-search');
+  const dropdown = document.getElementById('hosp-dropdown-list');
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { dropdown.style.display = 'none'; return; }
+    const matches = DIM_HOSPITAL
+      .filter(h => h.name.toLowerCase().includes(q) || h.hcode.includes(q))
+      .slice(0, 20);
+    if (!matches.length) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = matches.map(h =>
+      `<div class="hosp-option" onclick="selectHospital('${h.hcode}')"
+        style="padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;">
+        <strong>${h.hcode}</strong> ${esc(h.name)}
+        <span style="color:var(--gray-600);font-size:12px;margin-left:6px;">${esc(h.province)} · ${esc(h.level)}</span>
+      </div>`
+    ).join('');
+    dropdown.style.display = 'block';
+    // position under input
+    const rect = input.getBoundingClientRect();
+    dropdown.style.top = (rect.bottom + window.scrollY + 2) + 'px';
+    dropdown.style.left = rect.left + 'px';
+  });
+
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target)) dropdown.style.display = 'none';
+  });
+}
+
+function selectHospital(hcode) {
+  state.hospSelected = hcode;
+  const h = idx.hospitalByHcode.get(hcode);
+  document.getElementById('hosp-dropdown-list').style.display = 'none';
+  document.getElementById('hosp-search').value = h ? `${h.hcode} — ${h.name}` : hcode;
+
+  const info = document.getElementById('hosp-selected-info');
+  info.style.display = 'block';
+  info.innerHTML = h
+    ? `<strong>${esc(h.name)}</strong> &nbsp;|&nbsp; รหัส: <code>${h.hcode}</code> &nbsp;|&nbsp; จังหวัด: ${esc(h.province)} &nbsp;|&nbsp; ระดับ: ${esc(h.level)} &nbsp;|&nbsp; สถานะ: ${esc(h.status)}`
+    : `hcode: ${hcode}`;
+
+  renderHospResults(hcode);
+}
+
+function renderHospResults(hcode) {
+  const h = idx.hospitalByHcode.get(hcode);
+  if (!h) return;
+
+  const province = h.province;
+  const level    = h.level;
+  const section  = state.hospSection;
+
+  // hcodes ระดับเดียวกัน
+  const peerHcodes = new Set(idx.hospitalsByLevel.get(level) || []);
+  // hcodes จังหวัดเดียวกัน
+  const provHcodes = new Set(idx.hospitalsByProvince.get(province) || []);
+
+  // helper: avg ราคาจาก set ของ hcodes สำหรับ item code_moph
+  const calcAvg = (hcodeSet, code_moph, priceIdx) => {
+    const hospMap = idx.pricesByItem.get(code_moph);
+    if (!hospMap) return null;
+    const vals = [];
+    for (const [hc, pv] of hospMap.entries()) {
+      if (hcodeSet.has(hc) && pv[priceIdx] > 0) vals.push(pv[priceIdx]);
+    }
+    return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+  };
+
+  // Filter items ตาม section และต้องมีราคาของ รพ.นี้
+  const items = DIM_ITEM.filter(item => {
+    if (section && item[1] !== section) return false;
+    const prices = idx.priceByKey.get(`${hcode}|${item[0]}`);
+    return prices && (prices[0] > 0 || prices[1] > 0);
+  });
+
+  const bt = ' style="background:#f5fbff;"';
+  const bf = ' style="background:#fffdf0;"';
+  const bth = ' style="background:#dbeeff;font-weight:600;"';
+  const bfh = ' style="background:#fff3cd;font-weight:600;"';
+
+  const d = (v, bg='') => v != null
+    ? `<td class="num"${bg}>${fmtPrice(v)}</td>`
+    : `<td class="num"${bg}><span class="text-muted">—</span></td>`;
+
+  const tbody = items.map(item => {
+    const code      = item[0];
+    const prices    = idx.priceByKey.get(`${hcode}|${code}`) || [null,null];
+    const pt        = prices[0] > 0 ? prices[0] : null;
+    const pf        = prices[1] > 0 ? prices[1] : null;
+    const ceilT     = item[6] > 0 ? item[6] : null;
+    const ceilF     = item[7] > 0 ? item[7] : null;
+
+    const peerAvgT  = calcAvg(peerHcodes, code, 0);
+    const provAvgT  = calcAvg(provHcodes, code, 0);
+    const peerAvgF  = calcAvg(peerHcodes, code, 1);
+    const provAvgF  = calcAvg(provHcodes, code, 1);
+    // region avg: ใช้ทุก entry ใน pricesByItem โดยตรง (ไม่ต้อง filter hcodeSet)
+    const hospMap2  = idx.pricesByItem.get(code);
+    const regValsT  = hospMap2 ? [...hospMap2.values()].map(v=>v[0]).filter(p=>p>0) : [];
+    const regValsF  = hospMap2 ? [...hospMap2.values()].map(v=>v[1]).filter(p=>p>0) : [];
+    const regAvgT   = regValsT.length ? regValsT.reduce((a,b)=>a+b,0)/regValsT.length : null;
+    const regAvgF   = regValsF.length ? regValsF.reduce((a,b)=>a+b,0)/regValsF.length : null;
+
+    // สี ราคาที่กำหนด vs เพดาน
+    const colorT = pt && ceilT ? (pt > ceilT ? 'color:#e74c3c;' : 'color:#27ae60;') : '';
+    const colorF = pf && ceilF ? (pf > ceilF ? 'color:#e74c3c;' : 'color:#27ae60;') : '';
+
+    const sec = idx.sectionByCode.get(item[1]);
+    const sectionLabel = sec ? `<span class="badge badge-primary">${item[1]}</span>` : item[1];
+
+    return `<tr>
+      <td class="code">${esc(code)}</td>
+      <td>${esc(item[4])}</td>
+      <td>${sectionLabel}</td>
+      <td class="fs-12 text-muted">${esc(item[5]||'')}</td>
+      ${d(ceilT,bt)}
+      <td class="num"${bth}><span style="${colorT}">${pt!=null?fmtPrice(pt):'—'}</span></td>
+      ${d(peerAvgT,bt)}${d(provAvgT,bt)}${d(regAvgT,bt)}
+      ${d(ceilF,bf)}
+      <td class="num"${bfh}><span style="${colorF}">${pf!=null?fmtPrice(pf):'—'}</span></td>
+      ${d(peerAvgF,bf)}${d(provAvgF,bf)}${d(regAvgF,bf)}
+    </tr>`;
+  }).join('') || `<tr><td colspan="14" class="empty-state">ไม่มีรายการที่มีราคา</td></tr>`;
+
+  document.getElementById('hosp-tbody').innerHTML = tbody;
+  document.getElementById('hosp-footer').textContent =
+    `${esc(h.name)} — แสดง ${items.length.toLocaleString()} รายการที่มีราคา`;
+}
+
+/* ===================================================
+   DETAIL PANEL
+   =================================================== */
+function openDetailPanel(code) {
+  state.currentDetailCode = code;
+  const item = idx.itemByCode.get(code);
+  if (!item) return;
+
+  const section = idx.sectionByCode.get(item[1]);
+  document.getElementById('panel-item-name').textContent = item[4];
+  document.getElementById('panel-item-code').textContent =
+    `${code} | ${section ? section.name : item[1]} | หน่วย: ${item[5] || '—'}`;
+
+  // pricesByItem is now Map<hcode, [pt, pf, year, round]>
+  const hospMap = idx.pricesByItem.get(code) || new Map();
+  const allEntries = [...hospMap.entries()]; // [[hcode, [pt,pf,year,round]], ...]
+  const ceilThai = item[6] > 0 ? item[6] : null;
+  const ceilForeign = item[7] > 0 ? item[7] : null;
+
+  const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+  const thaiVals = allEntries.map(([, v]) => v[0]).filter(p => p > 0);
+  const foreignVals = allEntries.map(([, v]) => v[1]).filter(p => p > 0);
+
+  // Province breakdown
+  const provBreakdown = new Map(); // province → {t:[], f:[]}
+  for (const [hcode, v] of allEntries) {
+    const h = idx.hospitalByHcode.get(hcode);
+    if (!h) continue;
+    const prov = h.province;
+    if (!provBreakdown.has(prov)) provBreakdown.set(prov, { t: [], f: [] });
+    if (v[0] > 0) provBreakdown.get(prov).t.push(v[0]);
+    if (v[1] > 0) provBreakdown.get(prov).f.push(v[1]);
+  }
+
+  let html = `
+    <div class="panel-section">
+      <div class="panel-section-title">เพดานอัตราค่าบริการ</div>
+      <div class="panel-stat-row"><span class="panel-stat-label">เพดาน คนไทย</span><span class="panel-stat-val">${ceilThai !== null ? fmtPrice(ceilThai) : '—'} บาท</span></div>
+      <div class="panel-stat-row"><span class="panel-stat-label">เพดาน ต่างชาติ</span><span class="panel-stat-val">${ceilForeign !== null ? fmtPrice(ceilForeign) : '—'} บาท</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">สถิติเขต (ราคาล่าสุดทุกรอบ)</div>
+      <div class="panel-stat-row"><span class="panel-stat-label">จำนวน รพ. ที่มีบริการ (ไทย)</span><span class="panel-stat-val">${thaiVals.length} แห่ง</span></div>
+      <div class="panel-stat-row"><span class="panel-stat-label">ค่าเฉลี่ยเขต (ไทย)</span><span class="panel-stat-val">${avg(thaiVals) !== null ? fmtPrice(avg(thaiVals)) : '—'} บาท</span></div>
+      <div class="panel-stat-row"><span class="panel-stat-label">ต่ำสุด / สูงสุด (ไทย)</span><span class="panel-stat-val">${thaiVals.length > 0 ? fmtPrice(Math.min(...thaiVals)) + ' / ' + fmtPrice(Math.max(...thaiVals)) : '—'}</span></div>
+      <div class="panel-stat-row"><span class="panel-stat-label">จำนวน รพ. ที่มีบริการ (ต่างชาติ)</span><span class="panel-stat-val">${foreignVals.length} แห่ง</span></div>
+      <div class="panel-stat-row"><span class="panel-stat-label">ค่าเฉลี่ยเขต (ต่างชาติ)</span><span class="panel-stat-val">${avg(foreignVals) !== null ? fmtPrice(avg(foreignVals)) : '—'} บาท</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">แยกตามจังหวัด (ไทย)</div>`;
+
+  const provs = [...provBreakdown.keys()].sort();
+  if (provs.length === 0) {
+    html += `<div class="text-muted">ไม่มีข้อมูล</div>`;
+  } else {
+    for (const prov of provs) {
+      const d = provBreakdown.get(prov);
+      const a = avg(d.t);
+      html += `<div class="panel-stat-row">
+        <span class="panel-stat-label">${prov} (${d.t.length} รพ.)</span>
+        <span class="panel-stat-val">${a !== null ? fmtPrice(a) : '—'} บาท</span>
+      </div>`;
+    }
+  }
+
+  html += `</div>`;
+  document.getElementById('panel-body').innerHTML = html;
+  document.getElementById('detail-overlay').style.display = 'block';
+  document.getElementById('detail-panel').classList.add('open');
+  document.addEventListener('keydown', _escClose);
+}
+
+function _escClose(e) {
+  if (e.key === 'Escape') closeDetailPanel();
+}
+
+function closeDetailPanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('detail-overlay').style.display = 'none';
+  document.removeEventListener('keydown', _escClose);
+  state.currentDetailCode = null;
+}
+
+/* ===================================================
+   TAB 3: HOSPITAL COMPARISON
+   =================================================== */
+function renderCompareTab() {
+  // Populate section select
+  const sel = document.getElementById('comp-section-select');
+  sel.innerHTML = `<option value="">ทุกหมวด</option>` +
+    DIM_SECTION.sort((a, b) => a.order - b.order).map(s =>
+      `<option value="${s.code}">${s.code} — ${s.name}</option>`
+    ).join('');
+
+  // Hospital search
+  const hospInput = document.getElementById('hosp-search');
+  const dropdown = document.getElementById('hosp-dropdown');
+
+  function updateHospDropdown() {
+    const q = hospInput.value.trim().toLowerCase();
+    if (!q) { dropdown.classList.remove('open'); return; }
+
+    const matches = DIM_HOSPITAL.filter(h =>
+      h.name.toLowerCase().includes(q) ||
+      String(h.hcode).includes(q) ||
+      (h.province || '').toLowerCase().includes(q)
+    ).slice(0, 50);
+
+    if (matches.length === 0) {
+      dropdown.innerHTML = `<div class="hosp-option text-muted">ไม่พบหน่วยบริการ</div>`;
+    } else {
+      dropdown.innerHTML = matches.map(h => {
+        const isSelected = state.selectedHosps.some(s => s.hcode === h.hcode);
+        return `<div class="hosp-option ${isSelected ? 'selected' : ''}" data-hcode="${h.hcode}">
+          <div class="hosp-option-name">${esc(h.name)}</div>
+          <div class="hosp-option-meta">${h.hcode} | ${h.province} | ${h.level || '—'}</div>
+        </div>`;
+      }).join('');
+
+      dropdown.querySelectorAll('.hosp-option[data-hcode]').forEach(el => {
+        el.addEventListener('click', () => {
+          const hcode = el.dataset.hcode;
+          const h = idx.hospitalByHcode.get(hcode);
+          if (!h) return;
+          if (state.selectedHosps.some(s => s.hcode === hcode)) {
+            state.selectedHosps = state.selectedHosps.filter(s => s.hcode !== hcode);
+          } else if (state.selectedHosps.length < 10) {
+            state.selectedHosps.push(h);
+          }
+          hospInput.value = '';
+          dropdown.classList.remove('open');
+          renderSelectedHosps();
+          renderCompTable();
+        });
+      });
+    }
+    dropdown.classList.add('open');
+  }
+
+  hospInput.addEventListener('input', updateHospDropdown);
+  hospInput.addEventListener('focus', updateHospDropdown);
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.hospital-selector-wrap'))
+      dropdown.classList.remove('open');
+  });
+
+  // Price type toggle
+  document.querySelectorAll('[data-price-type]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-price-type]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.compPriceType = btn.dataset.priceType;
+      renderCompTable();
+    });
+  });
+
+  // Section select
+  sel.addEventListener('change', () => {
+    state.compSection = sel.value;
+    renderCompTable();
+  });
+
+  // Search in results
+  let compSearchTimer;
+  document.getElementById('comp-item-search').addEventListener('input', e => {
+    clearTimeout(compSearchTimer);
+    compSearchTimer = setTimeout(() => {
+      state.compQuery = e.target.value.trim().toLowerCase();
+      renderCompTable();
+    }, 200);
+  });
+
+  // Export CSV
+  document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+}
+
+function renderSelectedHosps() {
+  const container = document.getElementById('selected-hospitals');
+  if (state.selectedHosps.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = state.selectedHosps.map(h => `
+    <div class="selected-hosp-tag">
+      <span>${esc(h.name)}</span>
+      <button onclick="removeHosp('${h.hcode}')" title="ลบ">&#10005;</button>
+    </div>`).join('');
+}
+
+function removeHosp(hcode) {
+  state.selectedHosps = state.selectedHosps.filter(h => h.hcode !== hcode);
+  renderSelectedHosps();
+  renderCompTable();
+}
+
+function renderCompTable() {
+  const { selectedHosps, compPriceType, compSection, compQuery } = state;
+
+  const empty = document.getElementById('comp-empty');
+  const container = document.getElementById('comp-table-container');
+
+  if (selectedHosps.length === 0) {
+    empty.style.display = '';
+    container.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  container.style.display = '';
+
+  const isThai = compPriceType === 'thai';
+  const ceilIdx = isThai ? 6 : 7;
+  const priceValIdx = isThai ? 0 : 1; // index into [pt, pf, year, round]
+
+  // Determine which items to show
+  // Show only items where at least one selected hospital has a price (key = `${hcode}|${code}`)
+  const itemSet = new Set();
+  for (const hosp of selectedHosps) {
+    const prefix = `${hosp.hcode}|`;
+    for (const [key] of idx.priceByKey) {
+      if (key.startsWith(prefix)) {
+        const code = key.slice(prefix.length);
+        itemSet.add(code);
+      }
+    }
+  }
+
+  let items = [...itemSet].map(code => idx.itemByCode.get(code)).filter(Boolean);
+  if (compSection) items = items.filter(it => it[1] === compSection);
+  if (compQuery) {
+    items = items.filter(it =>
+      it[0].toLowerCase().includes(compQuery) ||
+      it[4].toLowerCase().includes(compQuery)
+    );
+  }
+  items.sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
+
+  // Region avg helper — iterate all hospitals in hospMap
+  function regionAvg(code) {
+    const hospMap = idx.pricesByItem.get(code);
+    if (!hospMap) return null;
+    const vals = [...hospMap.values()].map(v => v[priceValIdx]).filter(v => v > 0);
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }
+
+  // Peer group avg (same level) — single hospital selected
+  const isSingle = selectedHosps.length === 1;
+  function peerAvg(code) {
+    if (!isSingle) return null;
+    const hosp = selectedHosps[0];
+    const peerHcodes = new Set(idx.hospitalsByLevel.get(hosp.level) || []);
+    const hospMap = idx.pricesByItem.get(code);
+    if (!hospMap) return null;
+    const vals = [...hospMap.entries()]
+      .filter(([hc]) => peerHcodes.has(hc))
+      .map(([, v]) => v[priceValIdx]).filter(v => v > 0);
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }
+  function provAvg(code) {
+    if (!isSingle) return null;
+    const hosp = selectedHosps[0];
+    const provHcodes = new Set(idx.hospitalsByProvince.get(hosp.province) || []);
+    const hospMap = idx.pricesByItem.get(code);
+    if (!hospMap) return null;
+    const vals = [...hospMap.entries()]
+      .filter(([hc]) => provHcodes.has(hc))
+      .map(([, v]) => v[priceValIdx]).filter(v => v > 0);
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }
+
+  // Build header
+  const thead = document.getElementById('comp-thead');
+  thead.innerHTML = `<tr>
+    <th style="min-width:90px">CODE MOPH</th>
+    <th style="min-width:200px">ชื่อรายการ</th>
+    <th class="num hosp-col" style="background:var(--gray-100);color:var(--gray-700)">เพดาน (${isThai ? 'ไทย' : 'ต่างชาติ'})</th>
+    ${selectedHosps.map(h => `<th class="num hosp-col" title="${esc(h.name)}">${esc(h.name.length > 20 ? h.name.substring(0, 20) + '…' : h.name)}</th>`).join('')}
+    ${isSingle ? `<th class="num avg-col">เฉลี่ยกลุ่ม<br><span class="fs-12" style="font-weight:400">(${esc(selectedHosps[0]?.level || '')})</span></th>` : ''}
+    ${isSingle ? `<th class="num avg-col">เฉลี่ยจังหวัด<br><span class="fs-12" style="font-weight:400">(${esc(selectedHosps[0]?.province || '')})</span></th>` : ''}
+    <th class="num avg-col">เฉลี่ยเขต</th>
+  </tr>`;
+
+  // Limit rows
+  const MAX_ROWS = 800;
+  const total = items.length;
+  const displayItems = items.slice(0, MAX_ROWS);
+
+  const tbody = document.getElementById('comp-tbody');
+  tbody.innerHTML = displayItems.map(item => {
+    const code = item[0];
+    const ceil = item[ceilIdx] > 0 ? item[ceilIdx] : null;
+    const rAvg = regionAvg(code);
+    const pAvg = peerAvg(code);
+    const pvAvg = provAvg(code);
+
+    const hospCells = selectedHosps.map(h => {
+      const priceRow = idx.priceByKey.get(`${h.hcode}|${code}`);
+      const price = priceRow ? priceRow[priceValIdx] : null;
+      const active = price && price > 0;
+      if (!active) return `<td class="num price-none">—</td>`;
+      const over = ceil !== null && price > ceil;
+      return `<td class="num ${over ? 'price-over' : 'price-ok'}">${fmtPrice(price)}</td>`;
+    }).join('');
+
+    return `<tr>
+      <td class="code">${esc(code)}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item[4])}">${esc(item[4])}</td>
+      <td class="num" style="color:var(--gray-700)">${ceil !== null ? fmtPrice(ceil) : '<span class="text-muted">—</span>'}</td>
+      ${hospCells}
+      ${isSingle ? `<td class="num" style="color:var(--primary)">${pAvg !== null ? fmtPrice(pAvg) : '<span class="text-muted">—</span>'}</td>` : ''}
+      ${isSingle ? `<td class="num" style="color:#8e44ad">${pvAvg !== null ? fmtPrice(pvAvg) : '<span class="text-muted">—</span>'}</td>` : ''}
+      <td class="num" style="color:var(--accent)">${rAvg !== null ? fmtPrice(rAvg) : '<span class="text-muted">—</span>'}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="20" class="empty-state">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>`;
+
+  document.getElementById('comp-footer').textContent =
+    `แสดง ${Math.min(total, MAX_ROWS).toLocaleString()} จาก ${total.toLocaleString()} รายการ`;
+  document.getElementById('comp-info').textContent =
+    `${selectedHosps.length} หน่วยบริการที่เลือก | ${total.toLocaleString()} รายการบริการ`;
+}
+
+/* ===================================================
+   EXPORT CSV
+   =================================================== */
+/* ===================================================
+   EXPORT — TAB 2 SEARCH
+   =================================================== */
+function exportSearchCSV() {
+  if (state.searchMode === 'item') {
+    exportItemSearchCSV();
+  } else {
+    exportHospCSV();
+  }
+}
+
+function exportItemSearchCSV() {
+  const { searchSection, searchQuery } = state;
+  let items = DIM_ITEM.filter(item => {
+    if (searchSection && item[1] !== searchSection) return false;
+    const q = searchQuery.toLowerCase();
+    if (q && !item[0].toLowerCase().includes(q) && !item[4].toLowerCase().includes(q)) return false;
+    return true;
+  });
+  items.sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
+
+  const headers = ['CODE_MOPH','ชื่อรายการ','หมวด','หน่วย',
+    'เพดาน_ไทย','เฉลี่ยเขต_ไทย','ต่ำสุด_ไทย','สูงสุด_ไทย',
+    'เพดาน_ต่างชาติ','เฉลี่ยเขต_ต่างชาติ','ต่ำสุด_ต่างชาติ','สูงสุด_ต่างชาติ',
+    'จำนวน_รพ.'
+  ];
+
+  const rows = items.map(item => {
+    const code = item[0];
+    const hospMap = idx.pricesByItem.get(code);
+    const tVals = hospMap ? [...hospMap.values()].map(v=>v[0]).filter(p=>p>0) : [];
+    const fVals = hospMap ? [...hospMap.values()].map(v=>v[1]).filter(p=>p>0) : [];
+    const avg = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : '';
+    return [
+      code, item[4], item[1], item[5]||'',
+      item[6]>0?item[6]:'', avg(tVals),
+      tVals.length?Math.min(...tVals):'', tVals.length?Math.max(...tVals):'',
+      item[7]>0?item[7]:'', avg(fVals),
+      fVals.length?Math.min(...fVals):'', fVals.length?Math.max(...fVals):'',
+      tVals.length
+    ];
+  });
+
+  downloadCSV([headers,...rows], `MOPH_Rate_Items_${new Date().toISOString().slice(0,10)}.csv`);
+}
+
+function exportHospCSV() {
+  const hcode = state.hospSelected;
+  if (!hcode) { alert('กรุณาเลือกหน่วยบริการก่อน'); return; }
+  const h = idx.hospitalByHcode.get(hcode);
+  const province = h?.province || '';
+  const level    = h?.level || '';
+  const peerHcodes = new Set(idx.hospitalsByLevel.get(level) || []);
+  const provHcodes = new Set(idx.hospitalsByProvince.get(province) || []);
+
+  const calcAvg2 = (hcodeSet, code, pi) => {
+    const hm = idx.pricesByItem.get(code);
+    if (!hm) return null;
+    const vals = [...hm.entries()].filter(([hc,v]) => hcodeSet.has(hc) && v[pi]>0).map(([,v])=>v[pi]);
+    return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+  };
+
+  const items = DIM_ITEM.filter(item => {
+    if (state.hospSection && item[1] !== state.hospSection) return false;
+    const pr = idx.priceByKey.get(`${hcode}|${item[0]}`);
+    return pr && (pr[0]>0 || pr[1]>0);
+  });
+
+  const headers = ['CODE_MOPH','ชื่อรายการ','หมวด','หน่วย',
+    'เพดาน_ไทย','ราคาที่กำหนด_ไทย','เฉลี่ยกลุ่ม_ไทย','เฉลี่ยจังหวัด_ไทย','เฉลี่ยเขต_ไทย',
+    'เพดาน_ต่างชาติ','ราคาที่กำหนด_ต่างชาติ','เฉลี่ยกลุ่ม_ต่างชาติ','เฉลี่ยจังหวัด_ต่างชาติ','เฉลี่ยเขต_ต่างชาติ'
+  ];
+
+  const rows = items.map(item => {
+    const code = item[0];
+    const pr = idx.priceByKey.get(`${hcode}|${code}`) || [null,null];
+    const hm = idx.pricesByItem.get(code);
+    const rVT = hm ? [...hm.values()].map(v=>v[0]).filter(p=>p>0) : [];
+    const rVF = hm ? [...hm.values()].map(v=>v[1]).filter(p=>p>0) : [];
+    const f = v => v!=null ? parseFloat(v.toFixed(2)) : '';
+    return [
+      code, item[4], item[1], item[5]||'',
+      item[6]>0?item[6]:'', pr[0]>0?pr[0]:'',
+      f(calcAvg2(peerHcodes,code,0)), f(calcAvg2(provHcodes,code,0)),
+      rVT.length?f(rVT.reduce((a,b)=>a+b,0)/rVT.length):'',
+      item[7]>0?item[7]:'', pr[1]>0?pr[1]:'',
+      f(calcAvg2(peerHcodes,code,1)), f(calcAvg2(provHcodes,code,1)),
+      rVF.length?f(rVF.reduce((a,b)=>a+b,0)/rVF.length):''
+    ];
+  });
+
+  const name = h ? h.name.replace(/[^ก-๙a-zA-Z0-9]/g,'_') : hcode;
+  downloadCSV([headers,...rows], `MOPH_Rate_${name}_${new Date().toISOString().slice(0,10)}.csv`);
+}
+
+function downloadCSV(data, filename) {
+  const bom = '﻿';
+  const content = data.map(row =>
+    row.map(cell => `"${String(cell==null?'':cell).replace(/"/g,'""')}"`).join(',')
+  ).join('\n');
+  const blob = new Blob([bom+content], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function exportCSV() {
+  const { selectedHosps, compPriceType, compSection, compQuery } = state;
+  if (selectedHosps.length === 0) return;
+
+  const isThai = compPriceType === 'thai';
+  const ceilIdx = isThai ? 6 : 7;
+  const priceValIdx = isThai ? 0 : 1; // index into [pt, pf, year, round]
+
+  // Collect items (same logic as renderCompTable)
+  const itemSet = new Set();
+  for (const hosp of selectedHosps) {
+    const prefix = `${hosp.hcode}|`;
+    for (const [key] of idx.priceByKey) {
+      if (key.startsWith(prefix)) {
+        itemSet.add(key.slice(prefix.length));
+      }
+    }
+  }
+
+  let items = [...itemSet].map(code => idx.itemByCode.get(code)).filter(Boolean);
+  if (compSection) items = items.filter(it => it[1] === compSection);
+  if (compQuery) items = items.filter(it =>
+    it[0].toLowerCase().includes(compQuery) || it[4].toLowerCase().includes(compQuery)
+  );
+  items.sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
+
+  const headers = ['CODE_MOPH', 'ชื่อรายการ', 'หมวด', 'หน่วย',
+    `เพดาน_${isThai ? 'ไทย' : 'ต่างชาติ'}`,
+    ...selectedHosps.map(h => h.name),
+    'ค่าเฉลี่ยเขต'
+  ];
+
+  const rows = items.map(item => {
+    const code = item[0];
+    const ceil = item[ceilIdx] > 0 ? item[ceilIdx] : '';
+    const hospPrices = selectedHosps.map(h => {
+      const pr = idx.priceByKey.get(`${h.hcode}|${code}`);
+      const v = pr ? pr[priceValIdx] : 0;
+      return v > 0 ? v : '';
+    });
+    const hospMap = idx.pricesByItem.get(code);
+    const regionPrices = hospMap
+      ? [...hospMap.values()].map(v => v[priceValIdx]).filter(v => v > 0)
+      : [];
+    const rAvg = regionPrices.length > 0
+      ? (regionPrices.reduce((a, b) => a + b, 0) / regionPrices.length).toFixed(2) : '';
+
+    return [code, item[4], item[1], item[5] || '', ceil, ...hospPrices, rAvg];
+  });
+
+  const csvContent = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const bom = '﻿';
+  const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `MOPH_Rate_Compare_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ===================================================
+   UTILITIES
+   =================================================== */
+function setEl(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+function fmt(n) { return n !== null && n !== undefined ? n.toLocaleString() : '—'; }
+
+function fmtPrice(n) {
+  if (n === null || n === undefined || n === 0) return '—';
+  return n % 1 === 0 ? n.toLocaleString() : n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ===================================================
+   BOOTSTRAP
+   =================================================== */
+// Wait for DOM + data scripts to be ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(init, 50));
+} else {
+  setTimeout(init, 50);
+}
+</script>
+</body>
+</html>
