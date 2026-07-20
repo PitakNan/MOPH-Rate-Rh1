@@ -620,6 +620,13 @@ tr:last-child td { border-bottom: none; }
   color: var(--gray-600);
   border-radius: 0 0 var(--radius) var(--radius);
 }
+/* แสดงผลไม่ครบ (ถูกตัดจำนวนแถว) — เน้นให้เห็นชัดว่ายังมีรายการเหลือ */
+.table-footer.truncated {
+  background: #fff3cd;
+  color: #8a6d00;
+  font-weight: 600;
+  border-top: 1px solid #ffe08a;
+}
 </style>
 </head>
 
@@ -627,11 +634,12 @@ tr:last-child td { border-bottom: none; }
 <div id="app">
 
 <!-- DATA SCRIPTS -->
-<script src="data/dim_section.js"></script>
-<script src="data/dim_subsection.js"></script>
-<script src="data/dim_item.js"></script>
-<script src="data/dim_hospital.js"></script>
-<script src="data/fact_price.js"></script>
+<!-- ?v=<timestamp> = cache-busting: export_js.py จะ bump เลขนี้อัตโนมัติทุกครั้งที่สร้างข้อมูลใหม่ ผู้ใช้จะได้ข้อมูลล่าสุดเสมอไม่ติด cache -->
+<script src="data/dim_section.js?v=202607201558"></script>
+<script src="data/dim_subsection.js?v=202607201558"></script>
+<script src="data/dim_item.js?v=202607201558"></script>
+<script src="data/dim_hospital.js?v=202607201558"></script>
+<script src="data/fact_price.js?v=202607201558"></script>
 
 <!-- LOADING OVERLAY -->
 <div id="loading-overlay">
@@ -811,7 +819,10 @@ tr:last-child td { border-bottom: none; }
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <div id="search-results-info" class="text-muted"></div>
-      <button id="btn-export-search" class="btn btn-success" style="font-size:13px;padding:6px 14px;" onclick="exportSearchCSV()">&#8595; Export CSV</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" style="font-size:13px;padding:6px 14px;" onclick="resetSearchFilters()">&#8635; ล้างตัวกรอง</button>
+        <button id="btn-export-search" class="btn btn-success" style="font-size:13px;padding:6px 14px;" onclick="exportSearchCSV()">&#8595; Export CSV</button>
+      </div>
     </div>
 
     <!-- ITEM MODE TABLE -->
@@ -930,7 +941,8 @@ tr:last-child td { border-bottom: none; }
                  placeholder="ชื่อรายการ / CODE...">
         </div>
 
-        <div class="filter-group" style="margin-left:auto;padding-top:20px">
+        <div class="filter-group" style="margin-left:auto;padding-top:20px;gap:8px">
+          <button class="btn btn-outline" onclick="resetCompareFilters()">&#8635; ล้างตัวกรอง</button>
           <button class="btn btn-success" id="btn-export-csv">&#8595; Export CSV</button>
         </div>
       </div>
@@ -1493,8 +1505,13 @@ function renderSearchResults() {
     </tr>`;
   }).join('') || `<tr><td colspan="13" class="empty-state">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>`;
 
-  document.getElementById('search-footer').textContent =
-    `แสดง ${Math.min(total, MAX_ROWS).toLocaleString()} จาก ${total.toLocaleString()} รายการ`;
+  const shown = Math.min(total, MAX_ROWS);
+  const truncated = total > MAX_ROWS;
+  const footer = document.getElementById('search-footer');
+  footer.textContent = truncated
+    ? `แสดง ${shown.toLocaleString()} จาก ${total.toLocaleString()} รายการ — แสดงไม่ครบ พิมพ์ค้นหาหรือเลือกหมวดเพื่อดูรายการที่เหลือ`
+    : `แสดง ${shown.toLocaleString()} จาก ${total.toLocaleString()} รายการ`;
+  footer.classList.toggle('truncated', truncated);
   updateSortIndicators('#item-mode-table', state.searchSort);
 }
 
@@ -2019,8 +2036,12 @@ function renderCompTable() {
     </tr>`;
   }).join('') || `<tr><td colspan="20" class="empty-state">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>`;
 
-  document.getElementById('comp-footer').textContent =
-    `แสดง ${Math.min(total, MAX_ROWS).toLocaleString()} จาก ${total.toLocaleString()} รายการ`;
+  const compTrunc = total > MAX_ROWS;
+  const compFooter = document.getElementById('comp-footer');
+  compFooter.textContent = compTrunc
+    ? `แสดง ${Math.min(total, MAX_ROWS).toLocaleString()} จาก ${total.toLocaleString()} รายการ — แสดงไม่ครบ กรองด้วยหมวดหรือค้นหาเพื่อดูรายการที่เหลือ`
+    : `แสดง ${Math.min(total, MAX_ROWS).toLocaleString()} จาก ${total.toLocaleString()} รายการ`;
+  compFooter.classList.toggle('truncated', compTrunc);
   document.getElementById('comp-info').textContent =
     `${selectedHosps.length} หน่วยบริการที่เลือก | ${total.toLocaleString()} รายการบริการ`;
 }
@@ -2221,6 +2242,61 @@ function esc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+/* ===================================================
+   ล้างตัวกรอง (Reset)
+   =================================================== */
+function resetSearchFilters() {
+  if (state.searchMode === 'item') {
+    state.searchQuery = '';
+    state.searchSection = '';
+    state.searchSort = { col: null, dir: 'asc' };
+    const inp = document.getElementById('item-search');
+    if (inp) inp.value = '';
+    const cc = document.getElementById('section-chips');
+    if (cc) cc.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.section === ''));
+    renderSearchResults();
+  } else {
+    // โหมดหน่วยบริการ: ล้างหมวด + การจัดลำดับ + รอบที่เลือก (คงหน่วยที่เลือกไว้)
+    state.hospSection = '';
+    state.hospSort = { col: null, dir: 'asc' };
+    const cc = document.getElementById('hosp-section-chips');
+    if (cc) cc.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.hsection === ''));
+    if (state.hospSelected) {
+      const hist = submissionHistory(state.hospSelected);
+      state.hospRound = hist.length ? hist[hist.length - 1] : null;
+      renderRoundSelector(state.hospSelected);
+      renderHospResults(state.hospSelected);
+    }
+  }
+}
+
+function resetCompareFilters() {
+  state.selectedHosps = [];
+  state.compSection = '';
+  state.compQuery = '';
+  state.compPriceType = 'thai';
+  const cs = document.getElementById('comp-item-search'); if (cs) cs.value = '';
+  const ss = document.getElementById('comp-section-select'); if (ss) ss.value = '';
+  document.querySelectorAll('[data-price-type]').forEach(b =>
+    b.classList.toggle('active', b.dataset.priceType === 'thai'));
+  renderSelectedHosps();
+  renderCompTable();
+}
+
+/* ===================================================
+   คีย์ลัด: กด "/" เพื่อโฟกัสช่องค้นหาของแท็บที่เปิดอยู่
+   =================================================== */
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.ctrlKey || e.altKey || e.metaKey) return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;   // กำลังพิมพ์อยู่แล้ว ไม่แทรก
+  const panel = document.querySelector('.tab-panel.active');
+  if (!panel) return;
+  // เลือกช่องค้นหาช่องแรกที่ "มองเห็นได้" ในแท็บนั้น (offsetParent=null คือถูกซ่อน display:none)
+  const inp = [...panel.querySelectorAll('input[type=search]')].find(el => el.offsetParent !== null);
+  if (inp) { e.preventDefault(); inp.focus(); inp.select(); }
+});
 
 /* ===================================================
    BOOTSTRAP
