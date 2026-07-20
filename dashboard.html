@@ -788,6 +788,7 @@ tr:last-child td { border-bottom: none; }
       </div>
       <div id="hosp-dropdown-list" style="display:none;position:absolute;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);max-height:280px;overflow-y:auto;z-index:50;width:480px;margin-top:2px;"></div>
       <div id="hosp-selected-info" style="display:none;background:#e8f4fb;border:1px solid #1a6b9b33;border-radius:var(--radius);padding:10px 16px;margin-top:8px;font-size:14px;"></div>
+      <div id="hosp-round-selector" style="display:none;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;"></div>
       <div class="filters-bar" style="margin-top:8px;">
         <div id="hosp-section-chips" class="chip-group"></div>
       </div>
@@ -972,7 +973,11 @@ const state = {
   currentDetailCode: null,
   searchSort: { col: null, dir: 'asc' },  // การจัดลำดับตารางแถบค้นหารายการ
   hospSort:   { col: null, dir: 'asc' },  // การจัดลำดับตารางแถบค้นหาหน่วยบริการ
+  hospRound:  null,                        // รอบที่กำลังดูของหน่วยที่เลือก เช่น '2/2569'
 };
+
+// ราคาแยกรายรอบของหน่วยที่เลือกอยู่: Map<'รอบ/ปี', Map<code, [pt, pf]>>
+let hospRoundData = null;
 
 /* Indexes */
 const idx = {
@@ -1509,13 +1514,46 @@ function selectHospital(hcode) {
   document.getElementById('hosp-dropdown-list').style.display = 'none';
   document.getElementById('hosp-search-t2').value = h ? `${h.hcode} — ${h.name}` : hcode;
 
+  // สร้างราคาแยกรายรอบของหน่วยนี้ (สแกน FACT_PRICE ครั้งเดียวตอนเลือก)
+  hospRoundData = new Map();
+  for (const [hc, code, year, round, pt, pf] of FACT_PRICE) {
+    if (hc !== hcode) continue;
+    const rk = `${round}/${year}`;
+    if (!hospRoundData.has(rk)) hospRoundData.set(rk, new Map());
+    hospRoundData.get(rk).set(code, [pt, pf]);
+  }
+  const hist = submissionHistory(hcode);           // เรียงเก่า→ใหม่
+  state.hospRound = hist.length ? hist[hist.length - 1] : null;  // ค่าเริ่มต้น = รอบล่าสุด
+
   const info = document.getElementById('hosp-selected-info');
   info.style.display = 'block';
   info.innerHTML = h
     ? `<strong>${esc(h.name)}</strong> &nbsp;|&nbsp; รหัส: <code>${h.hcode}</code> &nbsp;|&nbsp; จังหวัด: ${esc(h.province)} &nbsp;|&nbsp; ระดับ: ${esc(h.level)} &nbsp;|&nbsp; สถานะ: ${esc(h.status)}<br>ประวัติการยื่น: ${historyBadges(hcode)}`
     : `hcode: ${hcode}`;
 
+  renderRoundSelector(hcode);
   renderHospResults(hcode);
+}
+
+// ปุ่มเลือกรอบ — แสดงเฉพาะหน่วยที่ยื่นมากกว่า 1 รอบ
+function renderRoundSelector(hcode) {
+  const hist = submissionHistory(hcode);
+  const box = document.getElementById('hosp-round-selector');
+  if (hist.length <= 1) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const latest = hist[hist.length - 1];
+  box.style.display = 'flex';
+  box.innerHTML = `<span class="filter-label" style="margin-right:2px">ดูข้อมูลรอบ:</span>` +
+    hist.map(r => {
+      const isLatest = r === latest;
+      return `<button class="toggle-btn round-btn ${r === state.hospRound ? 'active' : ''}" data-round="${r}">${r}${isLatest ? ' (ล่าสุด)' : ''}</button>`;
+    }).join('');
+  box.querySelectorAll('.round-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.hospRound = btn.dataset.round;
+      box.querySelectorAll('.round-btn').forEach(b => b.classList.toggle('active', b === btn));
+      renderHospResults(hcode);
+    });
+  });
 }
 
 function renderHospResults(hcode) {
@@ -1542,17 +1580,21 @@ function renderHospResults(hcode) {
     return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
   };
 
-  // Filter items ตาม section และต้องมีราคาของ รพ.นี้
+  // ราคาของ รพ.นี้ตาม "รอบที่เลือกดู" (ค่าเริ่มต้น = รอบล่าสุด)
+  // ค่าเฉลี่ยกลุ่ม/จังหวัด/เขต ยังใช้รอบล่าสุดของแต่ละหน่วยเป็น benchmark เสมอ (ไม่เอาชุดเก่ามาปน)
+  const roundMap = (hospRoundData && hospRoundData.get(state.hospRound)) || new Map();
+
+  // Filter items ตาม section และต้องมีราคาของ รพ.นี้ในรอบที่เลือก
   const items = DIM_ITEM.filter(item => {
     if (section && item[1] !== section) return false;
-    const prices = idx.priceByKey.get(`${hcode}|${item[0]}`);
+    const prices = roundMap.get(item[0]);
     return prices && (prices[0] > 0 || prices[1] > 0);
   });
 
   // สร้าง row object พร้อมค่าที่คำนวณแล้ว (เพื่อให้จัดลำดับได้)
   let rows = items.map(item => {
     const code    = item[0];
-    const prices  = idx.priceByKey.get(`${hcode}|${code}`) || [null,null];
+    const prices  = roundMap.get(code) || [null,null];
     // region avg: ใช้ทุก entry ใน pricesByItem โดยตรง (ไม่ต้อง filter hcodeSet)
     const hospMap2 = idx.pricesByItem.get(code);
     const regValsT = hospMap2 ? [...hospMap2.values()].map(v=>v[0]).filter(p=>p>0) : [];
@@ -1606,8 +1648,12 @@ function renderHospResults(hcode) {
   }).join('') || `<tr><td colspan="14" class="empty-state">ไม่มีรายการที่มีราคา</td></tr>`;
 
   document.getElementById('hosp-tbody').innerHTML = tbody;
+  const hist = submissionHistory(hcode);
+  const roundNote = state.hospRound ? ` — รอบ ${state.hospRound}` : '';
+  const cmpNote = (hist.length > 1 && state.hospRound !== hist[hist.length - 1])
+    ? ' (ค่าเฉลี่ยเทียบใช้รอบล่าสุดของแต่ละหน่วยเสมอ)' : '';
   document.getElementById('hosp-footer').textContent =
-    `${esc(h.name)} — แสดง ${rows.length.toLocaleString()} รายการที่มีราคา`;
+    `${esc(h.name)}${roundNote} — แสดง ${rows.length.toLocaleString()} รายการที่มีราคา${cmpNote}`;
   updateSortIndicators('#hosp-mode-table', state.hospSort);
 }
 
