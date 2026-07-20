@@ -215,6 +215,21 @@ input[type="text"]:focus, select:focus {
     border-color: var(--primary);
 }
 
+/* ช่องค้นหา — เน้นให้เด่น (highlight + สีกล่อง) */
+#search-input, #unit-select {
+    border: 2px solid var(--primary);
+    background: #f2f9ff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.06);
+    transition: border-color .2s, box-shadow .2s, background .2s;
+}
+#search-input::placeholder, #unit-select::placeholder { color: #5f8aa6; opacity: 1; }
+#search-input:hover, #unit-select:hover { background: #e9f4fd; }
+#search-input:focus, #unit-select:focus {
+    background: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(26,107,155,.18);
+}
+
 /* Data Table - Highest Readability */
 .data-wrapper {
     background: var(--white);

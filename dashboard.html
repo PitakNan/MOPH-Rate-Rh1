@@ -273,6 +273,21 @@ input[type=text]:focus, input[type=search]:focus, select:focus {
 .search-input { width: 260px; }
 .search-input-lg { width: 360px; }
 
+/* ช่องค้นหา — เน้นให้เด่น (highlight + สีกล่อง) */
+input[type=search] {
+  border: 2px solid var(--primary);
+  background: #f2f9ff;
+  font-weight: 500;
+  box-shadow: 0 1px 4px rgba(26,107,155,.12);
+}
+input[type=search]::placeholder { color: #5f8aa6; font-weight: 500; opacity: 1; }
+input[type=search]:hover { background: #e9f4fd; }
+input[type=search]:focus {
+  background: #fff;
+  border-color: var(--primary-dark);
+  box-shadow: 0 0 0 4px rgba(26,107,155,.20);
+}
+
 /* ===== CHIPS ===== */
 .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -990,6 +1005,7 @@ const idx = {
   submittedByYear: new Map(),     // year → Set of hcodes (for overview tab only)
   submittedByRound: new Map(),    // `${round}/${year}` → Set of hcodes (แยกรายรอบ เช่น '1/2569', '2/2569')
   sectionByCode: new Map(),       // section_code → section obj
+  codesByHcode: new Map(),        // hcode → Set of code (รายการที่หน่วยนี้มีราคาล่าสุด) — เร่งแท็บเปรียบเทียบ
 };
 
 let chartProvince, chartLevel, chartRounds;
@@ -998,6 +1014,39 @@ let chartProvince, chartLevel, chartRounds;
    INIT — build indexes
    =================================================== */
 function init() {
+  // การ์ดกันพลาด: ถ้าไฟล์ข้อมูลตัวใดโหลดไม่สำเร็จ จะแจ้งเตือนแทนที่จะค้างหน้าโหลดหมุนตลอด
+  const missing = [];
+  if (typeof DIM_HOSPITAL === 'undefined') missing.push('dim_hospital.js');
+  if (typeof DIM_ITEM      === 'undefined') missing.push('dim_item.js');
+  if (typeof DIM_SECTION   === 'undefined') missing.push('dim_section.js');
+  if (typeof FACT_PRICE    === 'undefined') missing.push('fact_price.js');
+  if (missing.length) {
+    showInitError('โหลดไฟล์ข้อมูลไม่สำเร็จ: ' + missing.join(', ') +
+      ' — ลองรีเฟรชหน้า (Ctrl+F5) หรือเช็กว่าไฟล์ในโฟลเดอร์ data/ ครบ');
+    return;
+  }
+  try {
+    buildIndexes();
+  } catch (err) {
+    console.error('init error:', err);
+    showInitError('เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: ' + (err && err.message ? err.message : err));
+  }
+}
+
+// แสดงข้อความ error บนหน้าโหลด (แทน spinner ที่หมุนไม่จบ)
+function showInitError(msg) {
+  const ov = document.getElementById('loading-overlay');
+  if (ov) {
+    ov.classList.remove('hidden');
+    ov.innerHTML = `<div style="max-width:520px;text-align:center;padding:24px">
+      <div style="font-size:40px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:16px;font-weight:600;color:#c0392b;margin-bottom:8px">ไม่สามารถแสดงข้อมูลได้</div>
+      <div style="font-size:14px;color:#555;line-height:1.6">${esc(msg)}</div>
+    </div>`;
+  }
+}
+
+function buildIndexes() {
   setLoadingMsg('กำลังสร้าง index โรงพยาบาล...');
 
   setTimeout(() => {
@@ -1021,38 +1070,47 @@ function init() {
     setLoadingMsg('กำลังสร้าง index ราคา...');
 
     setTimeout(() => {
-      // Price indexes — keep only latest price per hcode+code (highest year, then highest round)
-      for (const row of FACT_PRICE) {
-        const [hcode, code, year, round, pt, pf] = row;
+      try {
+        // Price indexes — keep only latest price per hcode+code (highest year, then highest round)
+        for (const row of FACT_PRICE) {
+          const [hcode, code, year, round, pt, pf] = row;
 
-        // submittedByYear — for overview tab informational charts only
-        if ((pt > 0) || (pf > 0)) {
-          if (!idx.submittedByYear.has(year)) idx.submittedByYear.set(year, new Set());
-          idx.submittedByYear.get(year).add(hcode);
-          const rkey = `${round}/${year}`;
-          if (!idx.submittedByRound.has(rkey)) idx.submittedByRound.set(rkey, new Set());
-          idx.submittedByRound.get(rkey).add(hcode);
+          // submittedByYear — for overview tab informational charts only
+          if ((pt > 0) || (pf > 0)) {
+            if (!idx.submittedByYear.has(year)) idx.submittedByYear.set(year, new Set());
+            idx.submittedByYear.get(year).add(hcode);
+            const rkey = `${round}/${year}`;
+            if (!idx.submittedByRound.has(rkey)) idx.submittedByRound.set(rkey, new Set());
+            idx.submittedByRound.get(rkey).add(hcode);
+
+            // codesByHcode — รายการที่หน่วยนี้เคยมีราคา (ใช้เร่งแท็บเปรียบเทียบ)
+            if (!idx.codesByHcode.has(hcode)) idx.codesByHcode.set(hcode, new Set());
+            idx.codesByHcode.get(hcode).add(code);
+          }
+
+          // priceByKey — keep latest price per hcode+code
+          const key = `${hcode}|${code}`;
+          const existing = idx.priceByKey.get(key);
+          if (!existing || year > existing[2] || (year === existing[2] && round > existing[3])) {
+            idx.priceByKey.set(key, [pt, pf, year, round]);
+          }
+
+          // pricesByItem — keep latest per hcode, merged across all years/rounds
+          const ikey = code;
+          if (!idx.pricesByItem.has(ikey)) idx.pricesByItem.set(ikey, new Map());
+          const hospMap = idx.pricesByItem.get(ikey);
+          const existingH = hospMap.get(hcode);
+          if (!existingH || year > existingH[2] || (year === existingH[2] && round > existingH[3])) {
+            hospMap.set(hcode, [pt, pf, year, round]);
+          }
         }
 
-        // priceByKey — keep latest price per hcode+code
-        const key = `${hcode}|${code}`;
-        const existing = idx.priceByKey.get(key);
-        if (!existing || year > existing[2] || (year === existing[2] && round > existing[3])) {
-          idx.priceByKey.set(key, [pt, pf, year, round]);
-        }
-
-        // pricesByItem — keep latest per hcode, merged across all years/rounds
-        const ikey = code;
-        if (!idx.pricesByItem.has(ikey)) idx.pricesByItem.set(ikey, new Map());
-        const hospMap = idx.pricesByItem.get(ikey);
-        const existingH = hospMap.get(hcode);
-        if (!existingH || year > existingH[2] || (year === existingH[2] && round > existingH[3])) {
-          hospMap.set(hcode, [pt, pf, year, round]);
-        }
+        document.getElementById('loading-overlay').classList.add('hidden');
+        renderAll();
+      } catch (err) {
+        console.error('buildIndexes error:', err);
+        showInitError('เกิดข้อผิดพลาดขณะสร้างดัชนีราคา: ' + (err && err.message ? err.message : err));
       }
-
-      document.getElementById('loading-overlay').classList.add('hidden');
-      renderAll();
     }, 20);
   }, 20);
 }
@@ -1873,17 +1931,11 @@ function renderCompTable() {
   const ceilIdx = isThai ? 6 : 7;
   const priceValIdx = isThai ? 0 : 1; // index into [pt, pf, year, round]
 
-  // Determine which items to show
-  // Show only items where at least one selected hospital has a price (key = `${hcode}|${code}`)
+  // Determine which items to show — รวม code ของทุกหน่วยที่เลือก (ใช้ index codesByHcode เร็วกว่าวน priceByKey ทั้งหมด)
   const itemSet = new Set();
   for (const hosp of selectedHosps) {
-    const prefix = `${hosp.hcode}|`;
-    for (const [key] of idx.priceByKey) {
-      if (key.startsWith(prefix)) {
-        const code = key.slice(prefix.length);
-        itemSet.add(code);
-      }
-    }
+    const codes = idx.codesByHcode.get(hosp.hcode);
+    if (codes) for (const code of codes) itemSet.add(code);
   }
 
   let items = [...itemSet].map(code => idx.itemByCode.get(code)).filter(Boolean);
@@ -1905,29 +1957,22 @@ function renderCompTable() {
   }
 
   // Peer group avg (same level) — single hospital selected
+  // สร้าง Set กลุ่ม/จังหวัดครั้งเดียว (เดิมสร้างใหม่ทุกแถว = ช้าเมื่อรายการเยอะ)
   const isSingle = selectedHosps.length === 1;
-  function peerAvg(code) {
-    if (!isSingle) return null;
-    const hosp = selectedHosps[0];
-    const peerHcodes = new Set(idx.hospitalsByLevel.get(hosp.level) || []);
+  const singleHosp = isSingle ? selectedHosps[0] : null;
+  const peerHcodes = isSingle ? new Set(idx.hospitalsByLevel.get(singleHosp.level) || []) : null;
+  const provHcodes = isSingle ? new Set(idx.hospitalsByProvince.get(singleHosp.province) || []) : null;
+  function avgOverSet(code, hcodeSet) {
     const hospMap = idx.pricesByItem.get(code);
     if (!hospMap) return null;
-    const vals = [...hospMap.entries()]
-      .filter(([hc]) => peerHcodes.has(hc))
-      .map(([, v]) => v[priceValIdx]).filter(v => v > 0);
-    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    let sum = 0, n = 0;
+    for (const [hc, v] of hospMap.entries()) {
+      if (hcodeSet.has(hc) && v[priceValIdx] > 0) { sum += v[priceValIdx]; n++; }
+    }
+    return n > 0 ? sum / n : null;
   }
-  function provAvg(code) {
-    if (!isSingle) return null;
-    const hosp = selectedHosps[0];
-    const provHcodes = new Set(idx.hospitalsByProvince.get(hosp.province) || []);
-    const hospMap = idx.pricesByItem.get(code);
-    if (!hospMap) return null;
-    const vals = [...hospMap.entries()]
-      .filter(([hc]) => provHcodes.has(hc))
-      .map(([, v]) => v[priceValIdx]).filter(v => v > 0);
-    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-  }
+  function peerAvg(code) { return isSingle ? avgOverSet(code, peerHcodes) : null; }
+  function provAvg(code) { return isSingle ? avgOverSet(code, provHcodes) : null; }
 
   // Build header
   const thead = document.getElementById('comp-thead');
@@ -2099,15 +2144,11 @@ function exportCSV() {
   const ceilIdx = isThai ? 6 : 7;
   const priceValIdx = isThai ? 0 : 1; // index into [pt, pf, year, round]
 
-  // Collect items (same logic as renderCompTable)
+  // Collect items (same logic as renderCompTable) — ใช้ index codesByHcode
   const itemSet = new Set();
   for (const hosp of selectedHosps) {
-    const prefix = `${hosp.hcode}|`;
-    for (const [key] of idx.priceByKey) {
-      if (key.startsWith(prefix)) {
-        itemSet.add(key.slice(prefix.length));
-      }
-    }
+    const codes = idx.codesByHcode.get(hosp.hcode);
+    if (codes) for (const code of codes) itemSet.add(code);
   }
 
   let items = [...itemSet].map(code => idx.itemByCode.get(code)).filter(Boolean);
