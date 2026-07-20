@@ -323,6 +323,13 @@ th {
 }
 th.num { text-align: right; }
 
+/* Sortable column headers */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { background: var(--primary-light); color: var(--primary); }
+th.sortable .sort-arrow { font-size: 9px; opacity: .35; margin-left: 3px; }
+th.sortable.sort-active { color: var(--primary); }
+th.sortable.sort-active .sort-arrow { opacity: 1; }
+
 td {
   padding: 8px 12px;
   border-bottom: 1px solid var(--gray-100);
@@ -657,6 +664,11 @@ tr:last-child td { border-bottom: none; }
         <div class="stat-sub">แห่ง ในเขตสุขภาพที่ 1</div>
       </div>
       <div class="stat-card accent">
+        <div class="stat-label">ยื่นอัตราค่าบริการ (รอบ 2/2569)</div>
+        <div class="stat-value" id="st-submitted-2569r2">—</div>
+        <div class="stat-sub">แห่ง</div>
+      </div>
+      <div class="stat-card accent">
         <div class="stat-label">ยื่นอัตราค่าบริการ (รอบ 1/2569)</div>
         <div class="stat-value" id="st-submitted-2569">—</div>
         <div class="stat-sub">แห่ง</div>
@@ -680,7 +692,7 @@ tr:last-child td { border-bottom: none; }
 
     <div class="chart-grid">
       <div class="card">
-        <div class="card-header">&#127961; การยื่นแยกตามจังหวัด (1/2569)</div>
+        <div class="card-header">&#127961; การยื่นแยกตามจังหวัด (แยกรายรอบ)</div>
         <div class="card-body">
           <div class="chart-wrap chart-wrap-tall">
             <canvas id="chart-province"></canvas>
@@ -694,7 +706,7 @@ tr:last-child td { border-bottom: none; }
             <canvas id="chart-level"></canvas>
           </div>
           <div class="mt-16">
-            <div class="card-header" style="border:none;padding:0 0 8px 0;font-size:13px">&#128202; สัดส่วนการยื่นแต่ละรอบ</div>
+            <div class="card-header" style="border:none;padding:0 0 8px 0;font-size:13px">&#128202; สัดส่วนการยื่น (เทียบรายปี)</div>
             <div class="chart-wrap" style="height:180px">
               <canvas id="chart-rounds"></canvas>
             </div>
@@ -712,9 +724,10 @@ tr:last-child td { border-bottom: none; }
               <tr>
                 <th>จังหวัด</th>
                 <th class="num">รพ.ทั้งหมด</th>
-                <th class="num">ยื่น 2568</th>
-                <th class="num">ยื่น 2569</th>
-                <th style="width:120px">สัดส่วน 2569</th>
+                <th class="num">ยื่น 1/2568</th>
+                <th class="num">ยื่น 1/2569</th>
+                <th class="num">ยื่น 2/2569</th>
+                <th style="width:120px">สัดส่วน ปี 2569</th>
               </tr>
             </thead>
             <tbody id="prov-tbody"></tbody>
@@ -729,9 +742,10 @@ tr:last-child td { border-bottom: none; }
               <tr>
                 <th>ระดับ</th>
                 <th class="num">รพ.ทั้งหมด</th>
-                <th class="num">ยื่น 2568</th>
-                <th class="num">ยื่น 2569</th>
-                <th class="num">% 2569</th>
+                <th class="num">ยื่น 1/2568</th>
+                <th class="num">ยื่น 1/2569</th>
+                <th class="num">ยื่น 2/2569</th>
+                <th class="num">% ปี 2569</th>
               </tr>
             </thead>
             <tbody id="level-tbody"></tbody>
@@ -789,23 +803,23 @@ tr:last-child td { border-bottom: none; }
       <table>
         <thead>
           <tr>
-            <th rowspan="2">CODE MOPH</th>
-            <th rowspan="2">ชื่อรายการ</th>
-            <th rowspan="2">หมวด</th>
-            <th rowspan="2">หน่วย</th>
+            <th rowspan="2" class="sortable" data-sort="code">CODE MOPH<span class="sort-arrow">⇅</span></th>
+            <th rowspan="2" class="sortable" data-sort="name">ชื่อรายการ<span class="sort-arrow">⇅</span></th>
+            <th rowspan="2" class="sortable" data-sort="section">หมวด<span class="sort-arrow">⇅</span></th>
+            <th rowspan="2" class="sortable" data-sort="unit">หน่วย<span class="sort-arrow">⇅</span></th>
             <th colspan="4" class="num group-header" style="background:#e8f4fb;border-bottom:2px solid #1a6b9b;">ราคาคนไทย</th>
             <th colspan="4" class="num group-header" style="background:#fef9e7;border-bottom:2px solid #e67e22;">ราคาต่างชาติ</th>
-            <th rowspan="2" class="num">จำนวน รพ.</th>
+            <th rowspan="2" class="num sortable" data-sort="count">จำนวน รพ.<span class="sort-arrow">⇅</span></th>
           </tr>
           <tr>
-            <th class="num" style="background:#e8f4fb;">เพดาน</th>
-            <th class="num" style="background:#e8f4fb;">เฉลี่ยเขต</th>
-            <th class="num" style="background:#e8f4fb;">ต่ำสุด</th>
-            <th class="num" style="background:#e8f4fb;">สูงสุด</th>
-            <th class="num" style="background:#fef9e7;">เพดาน</th>
-            <th class="num" style="background:#fef9e7;">เฉลี่ยเขต</th>
-            <th class="num" style="background:#fef9e7;">ต่ำสุด</th>
-            <th class="num" style="background:#fef9e7;">สูงสุด</th>
+            <th class="num sortable" data-sort="ceilThai" style="background:#e8f4fb;">เพดาน<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="avgThai" style="background:#e8f4fb;">เฉลี่ยเขต<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="mnThai" style="background:#e8f4fb;">ต่ำสุด<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="mxThai" style="background:#e8f4fb;">สูงสุด<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="ceilForeign" style="background:#fef9e7;">เพดาน<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="avgForeign" style="background:#fef9e7;">เฉลี่ยเขต<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="mnForeign" style="background:#fef9e7;">ต่ำสุด<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="mxForeign" style="background:#fef9e7;">สูงสุด<span class="sort-arrow">⇅</span></th>
           </tr>
         </thead>
         <tbody id="search-tbody"></tbody>
@@ -818,24 +832,24 @@ tr:last-child td { border-bottom: none; }
       <table>
         <thead>
           <tr>
-            <th rowspan="2">CODE MOPH</th>
-            <th rowspan="2">ชื่อรายการ</th>
-            <th rowspan="2">หมวด</th>
-            <th rowspan="2">หน่วย</th>
+            <th rowspan="2" class="sortable" data-sort="code">CODE MOPH<span class="sort-arrow">⇅</span></th>
+            <th rowspan="2" class="sortable" data-sort="name">ชื่อรายการ<span class="sort-arrow">⇅</span></th>
+            <th rowspan="2" class="sortable" data-sort="section">หมวด<span class="sort-arrow">⇅</span></th>
+            <th rowspan="2" class="sortable" data-sort="unit">หน่วย<span class="sort-arrow">⇅</span></th>
             <th colspan="5" class="num group-header" style="background:#e8f4fb;border-bottom:2px solid #1a6b9b;">ราคาคนไทย</th>
             <th colspan="5" class="num group-header" style="background:#fef9e7;border-bottom:2px solid #e67e22;">ราคาต่างชาติ</th>
           </tr>
           <tr>
-            <th class="num" style="background:#e8f4fb;">เพดาน</th>
-            <th class="num" style="background:#dbeeff;font-weight:700;">ราคาที่กำหนด</th>
-            <th class="num" style="background:#e8f4fb;">เฉลี่ยกลุ่ม</th>
-            <th class="num" style="background:#e8f4fb;">เฉลี่ยจังหวัด</th>
-            <th class="num" style="background:#e8f4fb;">เฉลี่ยเขต</th>
-            <th class="num" style="background:#fef9e7;">เพดาน</th>
-            <th class="num" style="background:#fff3cd;font-weight:700;">ราคาที่กำหนด</th>
-            <th class="num" style="background:#fef9e7;">เฉลี่ยกลุ่ม</th>
-            <th class="num" style="background:#fef9e7;">เฉลี่ยจังหวัด</th>
-            <th class="num" style="background:#fef9e7;">เฉลี่ยเขต</th>
+            <th class="num sortable" data-sort="ceilT" style="background:#e8f4fb;">เพดาน<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="pt" style="background:#dbeeff;font-weight:700;">ราคาที่กำหนด<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="peerAvgT" style="background:#e8f4fb;">เฉลี่ยกลุ่ม<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="provAvgT" style="background:#e8f4fb;">เฉลี่ยจังหวัด<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="regAvgT" style="background:#e8f4fb;">เฉลี่ยเขต<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="ceilF" style="background:#fef9e7;">เพดาน<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="pf" style="background:#fff3cd;font-weight:700;">ราคาที่กำหนด<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="peerAvgF" style="background:#fef9e7;">เฉลี่ยกลุ่ม<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="provAvgF" style="background:#fef9e7;">เฉลี่ยจังหวัด<span class="sort-arrow">⇅</span></th>
+            <th class="num sortable" data-sort="regAvgF" style="background:#fef9e7;">เฉลี่ยเขต<span class="sort-arrow">⇅</span></th>
           </tr>
         </thead>
         <tbody id="hosp-tbody"></tbody>
@@ -956,6 +970,8 @@ const state = {
   compQuery: '',
   selectedHosps: [],
   currentDetailCode: null,
+  searchSort: { col: null, dir: 'asc' },  // การจัดลำดับตารางแถบค้นหารายการ
+  hospSort:   { col: null, dir: 'asc' },  // การจัดลำดับตารางแถบค้นหาหน่วยบริการ
 };
 
 /* Indexes */
@@ -967,6 +983,7 @@ const idx = {
   hospitalsByProvince: new Map(), // province → [hcodes]
   hospitalsByLevel: new Map(),    // level → [hcodes]
   submittedByYear: new Map(),     // year → Set of hcodes (for overview tab only)
+  submittedByRound: new Map(),    // `${round}/${year}` → Set of hcodes (แยกรายรอบ เช่น '1/2569', '2/2569')
   sectionByCode: new Map(),       // section_code → section obj
 };
 
@@ -1007,6 +1024,9 @@ function init() {
         if ((pt > 0) || (pf > 0)) {
           if (!idx.submittedByYear.has(year)) idx.submittedByYear.set(year, new Set());
           idx.submittedByYear.get(year).add(hcode);
+          const rkey = `${round}/${year}`;
+          if (!idx.submittedByRound.has(rkey)) idx.submittedByRound.set(rkey, new Set());
+          idx.submittedByRound.get(rkey).add(hcode);
         }
 
         // priceByKey — keep latest price per hcode+code
@@ -1062,7 +1082,7 @@ function renderAll() {
 function updateHeaderMeta() {
   const sub2569 = idx.submittedByYear.get(2569)?.size ?? 0;
   document.getElementById('header-meta').textContent =
-    `ข้อมูล ณ รอบ 1/2569 | ยื่น ${sub2569} แห่ง`;
+    `ข้อมูล ณ รอบ 2/2569 | ยื่นปี 2569 รวม ${sub2569} แห่ง`;
 }
 
 /* ===================================================
@@ -1070,14 +1090,16 @@ function updateHeaderMeta() {
    =================================================== */
 function renderOverview() {
   const total = DIM_HOSPITAL.length;
-  const sub2569 = idx.submittedByYear.get(2569)?.size ?? 0;
-  const sub2568 = idx.submittedByYear.get(2568)?.size ?? 0;
+  const sub69r1 = idx.submittedByRound.get('1/2569')?.size ?? 0;
+  const sub69r2 = idx.submittedByRound.get('2/2569')?.size ?? 0;
+  const sub68r1 = idx.submittedByRound.get('1/2568')?.size ?? 0;
   const items = DIM_ITEM.length;
   const prices2569 = FACT_PRICE.filter(r => r[2] === 2569).length;
 
   setEl('st-total-hosp', fmt(total));
-  setEl('st-submitted-2569', fmt(sub2569));
-  setEl('st-submitted-2568', fmt(sub2568));
+  setEl('st-submitted-2569r2', fmt(sub69r2));
+  setEl('st-submitted-2569', fmt(sub69r1));
+  setEl('st-submitted-2568', fmt(sub68r1));
   setEl('st-items', fmt(items));
   setEl('st-prices-2569', fmt(prices2569));
 
@@ -1088,25 +1110,30 @@ function renderOverview() {
 
 function renderProvinceTable() {
   const provinces = [...idx.hospitalsByProvince.keys()].sort();
-  const sub2569 = idx.submittedByYear.get(2569) ?? new Set();
-  const sub2568 = idx.submittedByYear.get(2568) ?? new Set();
+  const subY69 = idx.submittedByYear.get(2569) ?? new Set();   // ปี 2569 รวมทุกรอบ (ใช้คิดสัดส่วน)
+  const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
+  const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
+  const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
   const maxSub = Math.max(...provinces.map(p => {
-    return (idx.hospitalsByProvince.get(p) || []).filter(h => sub2569.has(h)).length;
+    return (idx.hospitalsByProvince.get(p) || []).filter(h => subY69.has(h)).length;
   }));
 
   const tbody = document.getElementById('prov-tbody');
   tbody.innerHTML = provinces.map(prov => {
     const hcodes = idx.hospitalsByProvince.get(prov) || [];
     const n = hcodes.length;
-    const s69 = hcodes.filter(h => sub2569.has(h)).length;
-    const s68 = hcodes.filter(h => sub2568.has(h)).length;
-    const pct = n > 0 ? Math.round(s69 / n * 100) : 0;
-    const barW = maxSub > 0 ? Math.round(s69 / maxSub * 100) : 0;
+    const y69 = hcodes.filter(h => subY69.has(h)).length;
+    const r68 = hcodes.filter(h => s68r1.has(h)).length;
+    const r691 = hcodes.filter(h => s69r1.has(h)).length;
+    const r692 = hcodes.filter(h => s69r2.has(h)).length;
+    const pct = n > 0 ? Math.round(y69 / n * 100) : 0;
+    const barW = maxSub > 0 ? Math.round(y69 / maxSub * 100) : 0;
     return `<tr>
       <td>${prov}</td>
       <td class="num">${n}</td>
-      <td class="num">${s68}</td>
-      <td class="num"><strong>${s69}</strong></td>
+      <td class="num">${r68}</td>
+      <td class="num">${r691}</td>
+      <td class="num"><strong>${r692}</strong></td>
       <td><span class="prov-bar" style="width:${barW}px"></span> <span class="fs-12 text-muted">${pct}%</span></td>
     </tr>`;
   }).join('');
@@ -1114,21 +1141,26 @@ function renderProvinceTable() {
 
 function renderLevelTable() {
   const levels = [...idx.hospitalsByLevel.keys()].sort();
-  const sub2569 = idx.submittedByYear.get(2569) ?? new Set();
-  const sub2568 = idx.submittedByYear.get(2568) ?? new Set();
+  const subY69 = idx.submittedByYear.get(2569) ?? new Set();
+  const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
+  const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
+  const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
 
   const tbody = document.getElementById('level-tbody');
   tbody.innerHTML = levels.map(lv => {
     const hcodes = idx.hospitalsByLevel.get(lv) || [];
     const n = hcodes.length;
-    const s69 = hcodes.filter(h => sub2569.has(h)).length;
-    const s68 = hcodes.filter(h => sub2568.has(h)).length;
-    const pct = n > 0 ? Math.round(s69 / n * 100) : 0;
+    const y69 = hcodes.filter(h => subY69.has(h)).length;
+    const r68 = hcodes.filter(h => s68r1.has(h)).length;
+    const r691 = hcodes.filter(h => s69r1.has(h)).length;
+    const r692 = hcodes.filter(h => s69r2.has(h)).length;
+    const pct = n > 0 ? Math.round(y69 / n * 100) : 0;
     return `<tr>
       <td>${lv || '(ไม่ระบุ)'}</td>
       <td class="num">${n}</td>
-      <td class="num">${s68}</td>
-      <td class="num"><strong>${s69}</strong></td>
+      <td class="num">${r68}</td>
+      <td class="num">${r691}</td>
+      <td class="num"><strong>${r692}</strong></td>
       <td class="num"><span class="badge badge-${pct >= 80 ? 'success' : pct >= 50 ? 'warning' : 'danger'}">${pct}%</span></td>
     </tr>`;
   }).join('');
@@ -1138,12 +1170,13 @@ function renderCharts() {
   const provinces = [...idx.hospitalsByProvince.keys()].sort();
   const sub2569 = idx.submittedByYear.get(2569) ?? new Set();
   const sub2568 = idx.submittedByYear.get(2568) ?? new Set();
+  const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
+  const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
+  const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
 
-  /* Province bar chart */
-  const provData2569 = provinces.map(p =>
-    (idx.hospitalsByProvince.get(p) || []).filter(h => sub2569.has(h)).length);
-  const provData2568 = provinces.map(p =>
-    (idx.hospitalsByProvince.get(p) || []).filter(h => sub2568.has(h)).length);
+  /* Province bar chart — แยกรายรอบ */
+  const provCount = set => provinces.map(p =>
+    (idx.hospitalsByProvince.get(p) || []).filter(h => set.has(h)).length);
 
   if (chartProvince) chartProvince.destroy();
   chartProvince = new Chart(document.getElementById('chart-province'), {
@@ -1151,8 +1184,9 @@ function renderCharts() {
     data: {
       labels: provinces,
       datasets: [
-        { label: '1/2569', data: provData2569, backgroundColor: '#1a6b9b', borderRadius: 4 },
-        { label: '1/2568', data: provData2568, backgroundColor: '#e67e22', borderRadius: 4 },
+        { label: '2/2569', data: provCount(s69r2), backgroundColor: '#27ae60', borderRadius: 4 },
+        { label: '1/2569', data: provCount(s69r1), backgroundColor: '#1a6b9b', borderRadius: 4 },
+        { label: '1/2568', data: provCount(s68r1), backgroundColor: '#e67e22', borderRadius: 4 },
       ]
     },
     options: {
@@ -1179,7 +1213,7 @@ function renderCharts() {
     data: {
       labels: levels,
       datasets: [
-        { label: 'ยื่นแล้ว', data: lvData, backgroundColor: '#27ae60', borderRadius: 4 },
+        { label: 'ยื่นแล้ว (ปี 2569)', data: lvData, backgroundColor: '#27ae60', borderRadius: 4 },
         { label: 'ยังไม่ยื่น', data: lvTotal.map((t, i) => t - lvData[i]), backgroundColor: '#dee2e6', borderRadius: 4 }
       ]
     },
@@ -1199,7 +1233,7 @@ function renderCharts() {
   chartRounds = new Chart(document.getElementById('chart-rounds'), {
     type: 'doughnut',
     data: {
-      labels: ['ยื่นทั้ง 2 รอบ', 'ยื่นเฉพาะ 2569', 'ยื่นเฉพาะ 2568', 'ไม่ยื่น'],
+      labels: ['ยื่นทั้ง 2 ปี', 'ยื่นเฉพาะปี 2569', 'ยื่นเฉพาะปี 2568', 'ไม่เคยยื่น'],
       datasets: [{
         data: (() => {
           const all = DIM_HOSPITAL.map(h => h.hcode);
@@ -1243,6 +1277,56 @@ function setSearchMode(mode) {
   document.getElementById('hosp-mode-table').style.display    = mode === 'hospital' ? '' : 'none';
 }
 
+/* ===================================================
+   TABLE SORTING (หัวตารางคลิกจัดลำดับ)
+   =================================================== */
+// เรียง array ของ row object ตาม sortState — ค่า null ตกท้ายเสมอ, string เรียงแบบไทย
+function sortRows(rows, sortState) {
+  if (!sortState.col) return rows;
+  const { col, dir } = sortState;
+  const mul = dir === 'asc' ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const va = a[col], vb = b[col];
+    const na = (va === null || va === undefined || va === '');
+    const nb = (vb === null || vb === undefined || vb === '');
+    if (na && nb) return 0;
+    if (na) return 1;         // null ไปท้ายเสมอ ไม่ว่าจะ asc/desc
+    if (nb) return -1;
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * mul;
+    return String(va).localeCompare(String(vb), 'th') * mul;
+  });
+}
+
+// อัปเดตลูกศรบอกสถานะบนหัวตาราง
+function updateSortIndicators(tableSelector, sortState) {
+  document.querySelectorAll(`${tableSelector} th.sortable`).forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (th.dataset.sort === sortState.col) {
+      th.classList.add('sort-active');
+      if (arrow) arrow.textContent = sortState.dir === 'asc' ? '▲' : '▼';
+    } else {
+      th.classList.remove('sort-active');
+      if (arrow) arrow.textContent = '⇅';
+    }
+  });
+}
+
+// ผูก click handler ให้หัวตาราง (เรียกครั้งเดียวตอน init)
+function attachSortHandlers(tableSelector, sortState, rerenderFn) {
+  document.querySelectorAll(`${tableSelector} th.sortable`).forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortState.col === col) {
+        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.col = col;
+        sortState.dir = 'asc';
+      }
+      rerenderFn();
+    });
+  });
+}
+
 function renderSearchTab() {
   // Build section chips (item mode)
   const chipContainer = document.getElementById('section-chips');
@@ -1273,6 +1357,12 @@ function renderSearchTab() {
 
   renderSearchResults();
   initHospSearch();
+
+  // ผูกหัวตารางให้จัดลำดับได้ (ครั้งเดียว)
+  attachSortHandlers('#item-mode-table', state.searchSort, renderSearchResults);
+  attachSortHandlers('#hosp-mode-table', state.hospSort, () => {
+    if (state.hospSelected) renderHospResults(state.hospSelected);
+  });
 }
 
 function renderSearchResults() {
@@ -1288,55 +1378,61 @@ function renderSearchResults() {
     );
   }
 
-  // Limit display for performance
-  const MAX_ROWS = 500;
-  const total = items.length;
-  const displayItems = items.slice(0, MAX_ROWS);
-
-  const tbody = document.getElementById('search-tbody');
-  tbody.innerHTML = displayItems.map(item => {
+  // สร้าง row object พร้อมค่าที่คำนวณแล้ว (เพื่อให้จัดลำดับได้)
+  let rows = items.map(item => {
     const code = item[0];
-    const section = idx.sectionByCode.get(item[1]);
-    const sectionLabel = section ? `<span class="badge badge-primary">${item[1]}</span>` : item[1];
-    const ceilThai = item[6] > 0 ? item[6] : null;
-    const ceilForeign = item[7] > 0 ? item[7] : null;
-
     // pricesByItem is now Map<hcode, [pt, pf, year, round]>
     const hospMap = idx.pricesByItem.get(code);
-    const thaiPrices = hospMap
-      ? [...hospMap.values()].map(v => v[0]).filter(p => p > 0)
-      : [];
-    const count = thaiPrices.length;
-
-    const avgThai = count > 0 ? thaiPrices.reduce((a, b) => a + b, 0) / count : null;
-    const mnThai  = count > 0 ? Math.min(...thaiPrices) : null;
-    const mxThai  = count > 0 ? Math.max(...thaiPrices) : null;
-
+    const thaiPrices = hospMap ? [...hospMap.values()].map(v => v[0]).filter(p => p > 0) : [];
     const foreignPrices = hospMap ? [...hospMap.values()].map(v => v[1]).filter(p => p > 0) : [];
-    const cntF = foreignPrices.length;
-    const avgForeign = cntF > 0 ? foreignPrices.reduce((a, b) => a + b, 0) / cntF : null;
-    const mnForeign  = cntF > 0 ? Math.min(...foreignPrices) : null;
-    const mxForeign  = cntF > 0 ? Math.max(...foreignPrices) : null;
+    const count = thaiPrices.length;
+    const cntF  = foreignPrices.length;
+    return {
+      item, code,
+      name: item[4], section: item[1], unit: item[5] || '',
+      ceilThai:    item[6] > 0 ? item[6] : null,
+      avgThai:     count ? thaiPrices.reduce((a, b) => a + b, 0) / count : null,
+      mnThai:      count ? Math.min(...thaiPrices) : null,
+      mxThai:      count ? Math.max(...thaiPrices) : null,
+      ceilForeign: item[7] > 0 ? item[7] : null,
+      avgForeign:  cntF ? foreignPrices.reduce((a, b) => a + b, 0) / cntF : null,
+      mnForeign:   cntF ? Math.min(...foreignPrices) : null,
+      mxForeign:   cntF ? Math.max(...foreignPrices) : null,
+      count,
+    };
+  });
 
+  rows = sortRows(rows, state.searchSort);
+
+  // Limit display for performance
+  const MAX_ROWS = 500;
+  const total = rows.length;
+  const displayRows = rows.slice(0, MAX_ROWS);
+
+  const tbody = document.getElementById('search-tbody');
+  tbody.innerHTML = displayRows.map(r => {
+    const section = idx.sectionByCode.get(r.section);
+    const sectionLabel = section ? `<span class="badge badge-primary">${r.section}</span>` : r.section;
     const d = (v, bg='') => v !== null
       ? `<td class="num"${bg}>${fmtPrice(v)}</td>`
       : `<td class="num"${bg}><span class="text-muted">—</span></td>`;
     const bt = ' style="background:#f5fbff;"';
     const bf = ' style="background:#fffdf0;"';
 
-    return `<tr style="cursor:pointer" onclick="openDetailPanel('${esc(code)}')">
-      <td class="code">${esc(code)}</td>
-      <td>${esc(item[4])}</td>
+    return `<tr style="cursor:pointer" onclick="openDetailPanel('${esc(r.code)}')">
+      <td class="code">${esc(r.code)}</td>
+      <td>${esc(r.name)}</td>
       <td>${sectionLabel}</td>
-      <td class="fs-12 text-muted">${esc(item[5] || '')}</td>
-      ${d(ceilThai,bt)}${d(avgThai,bt)}${d(mnThai,bt)}${d(mxThai,bt)}
-      ${d(ceilForeign,bf)}${d(avgForeign,bf)}${d(mnForeign,bf)}${d(mxForeign,bf)}
-      <td class="num"><span class="badge badge-${count > 0 ? 'primary' : 'warning'}">${count}</span></td>
+      <td class="fs-12 text-muted">${esc(r.unit)}</td>
+      ${d(r.ceilThai,bt)}${d(r.avgThai,bt)}${d(r.mnThai,bt)}${d(r.mxThai,bt)}
+      ${d(r.ceilForeign,bf)}${d(r.avgForeign,bf)}${d(r.mnForeign,bf)}${d(r.mxForeign,bf)}
+      <td class="num"><span class="badge badge-${r.count > 0 ? 'primary' : 'warning'}">${r.count}</span></td>
     </tr>`;
   }).join('') || `<tr><td colspan="13" class="empty-state">ไม่พบรายการที่ตรงกับเงื่อนไข</td></tr>`;
 
   document.getElementById('search-footer').textContent =
     `แสดง ${Math.min(total, MAX_ROWS).toLocaleString()} จาก ${total.toLocaleString()} รายการ`;
+  updateSortIndicators('#item-mode-table', state.searchSort);
 }
 
 /* ===================================================
@@ -1373,7 +1469,7 @@ function initHospSearch() {
       `<div class="hosp-option" onclick="selectHospital('${h.hcode}')"
         style="padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;">
         <strong>${h.hcode}</strong> ${esc(h.name)}
-        <span style="color:var(--gray-600);font-size:12px;margin-left:6px;">${esc(h.province)} · ${esc(h.level)}</span>
+        <span style="color:var(--gray-600);font-size:12px;margin-left:6px;">${esc(h.province)} · ${esc(h.level)} · ยื่น: ${(x=>x.length?x.join(', '):'—')(submissionHistory(h.hcode))}</span>
       </div>`
     ).join('');
     dropdown.style.display = 'block';
@@ -1388,6 +1484,25 @@ function initHospSearch() {
   });
 }
 
+// ประวัติการยื่นของหน่วยบริการ — คืน list รอบที่เคยยื่น เรียงตามเวลา เช่น ['1/2568', '2/2569']
+function submissionHistory(hcode) {
+  const rounds = [];
+  for (const [rkey, set] of idx.submittedByRound.entries()) {
+    if (set.has(hcode)) rounds.push(rkey);
+  }
+  return rounds.sort((a, b) => {
+    const [ra, ya] = a.split('/').map(Number);
+    const [rb, yb] = b.split('/').map(Number);
+    return ya - yb || ra - rb;
+  });
+}
+
+function historyBadges(hcode) {
+  const hist = submissionHistory(hcode);
+  if (!hist.length) return '<span class="text-muted">ยังไม่เคยยื่น</span>';
+  return hist.map(r => `<span class="badge badge-primary" style="margin-right:4px">${r}</span>`).join('');
+}
+
 function selectHospital(hcode) {
   state.hospSelected = hcode;
   const h = idx.hospitalByHcode.get(hcode);
@@ -1397,7 +1512,7 @@ function selectHospital(hcode) {
   const info = document.getElementById('hosp-selected-info');
   info.style.display = 'block';
   info.innerHTML = h
-    ? `<strong>${esc(h.name)}</strong> &nbsp;|&nbsp; รหัส: <code>${h.hcode}</code> &nbsp;|&nbsp; จังหวัด: ${esc(h.province)} &nbsp;|&nbsp; ระดับ: ${esc(h.level)} &nbsp;|&nbsp; สถานะ: ${esc(h.status)}`
+    ? `<strong>${esc(h.name)}</strong> &nbsp;|&nbsp; รหัส: <code>${h.hcode}</code> &nbsp;|&nbsp; จังหวัด: ${esc(h.province)} &nbsp;|&nbsp; ระดับ: ${esc(h.level)} &nbsp;|&nbsp; สถานะ: ${esc(h.status)}<br>ประวัติการยื่น: ${historyBadges(hcode)}`
     : `hcode: ${hcode}`;
 
   renderHospResults(hcode);
@@ -1434,6 +1549,31 @@ function renderHospResults(hcode) {
     return prices && (prices[0] > 0 || prices[1] > 0);
   });
 
+  // สร้าง row object พร้อมค่าที่คำนวณแล้ว (เพื่อให้จัดลำดับได้)
+  let rows = items.map(item => {
+    const code    = item[0];
+    const prices  = idx.priceByKey.get(`${hcode}|${code}`) || [null,null];
+    // region avg: ใช้ทุก entry ใน pricesByItem โดยตรง (ไม่ต้อง filter hcodeSet)
+    const hospMap2 = idx.pricesByItem.get(code);
+    const regValsT = hospMap2 ? [...hospMap2.values()].map(v=>v[0]).filter(p=>p>0) : [];
+    const regValsF = hospMap2 ? [...hospMap2.values()].map(v=>v[1]).filter(p=>p>0) : [];
+    return {
+      code, name: item[4], section: item[1], unit: item[5] || '',
+      ceilT:    item[6] > 0 ? item[6] : null,
+      ceilF:    item[7] > 0 ? item[7] : null,
+      pt:       prices[0] > 0 ? prices[0] : null,
+      pf:       prices[1] > 0 ? prices[1] : null,
+      peerAvgT: calcAvg(peerHcodes, code, 0),
+      provAvgT: calcAvg(provHcodes, code, 0),
+      regAvgT:  regValsT.length ? regValsT.reduce((a,b)=>a+b,0)/regValsT.length : null,
+      peerAvgF: calcAvg(peerHcodes, code, 1),
+      provAvgF: calcAvg(provHcodes, code, 1),
+      regAvgF:  regValsF.length ? regValsF.reduce((a,b)=>a+b,0)/regValsF.length : null,
+    };
+  });
+
+  rows = sortRows(rows, state.hospSort);
+
   const bt = ' style="background:#f5fbff;"';
   const bf = ' style="background:#fffdf0;"';
   const bth = ' style="background:#dbeeff;font-weight:600;"';
@@ -1443,49 +1583,32 @@ function renderHospResults(hcode) {
     ? `<td class="num"${bg}>${fmtPrice(v)}</td>`
     : `<td class="num"${bg}><span class="text-muted">—</span></td>`;
 
-  const tbody = items.map(item => {
-    const code      = item[0];
-    const prices    = idx.priceByKey.get(`${hcode}|${code}`) || [null,null];
-    const pt        = prices[0] > 0 ? prices[0] : null;
-    const pf        = prices[1] > 0 ? prices[1] : null;
-    const ceilT     = item[6] > 0 ? item[6] : null;
-    const ceilF     = item[7] > 0 ? item[7] : null;
-
-    const peerAvgT  = calcAvg(peerHcodes, code, 0);
-    const provAvgT  = calcAvg(provHcodes, code, 0);
-    const peerAvgF  = calcAvg(peerHcodes, code, 1);
-    const provAvgF  = calcAvg(provHcodes, code, 1);
-    // region avg: ใช้ทุก entry ใน pricesByItem โดยตรง (ไม่ต้อง filter hcodeSet)
-    const hospMap2  = idx.pricesByItem.get(code);
-    const regValsT  = hospMap2 ? [...hospMap2.values()].map(v=>v[0]).filter(p=>p>0) : [];
-    const regValsF  = hospMap2 ? [...hospMap2.values()].map(v=>v[1]).filter(p=>p>0) : [];
-    const regAvgT   = regValsT.length ? regValsT.reduce((a,b)=>a+b,0)/regValsT.length : null;
-    const regAvgF   = regValsF.length ? regValsF.reduce((a,b)=>a+b,0)/regValsF.length : null;
-
+  const tbody = rows.map(r => {
     // สี ราคาที่กำหนด vs เพดาน
-    const colorT = pt && ceilT ? (pt > ceilT ? 'color:#e74c3c;' : 'color:#27ae60;') : '';
-    const colorF = pf && ceilF ? (pf > ceilF ? 'color:#e74c3c;' : 'color:#27ae60;') : '';
+    const colorT = r.pt && r.ceilT ? (r.pt > r.ceilT ? 'color:#e74c3c;' : 'color:#27ae60;') : '';
+    const colorF = r.pf && r.ceilF ? (r.pf > r.ceilF ? 'color:#e74c3c;' : 'color:#27ae60;') : '';
 
-    const sec = idx.sectionByCode.get(item[1]);
-    const sectionLabel = sec ? `<span class="badge badge-primary">${item[1]}</span>` : item[1];
+    const sec = idx.sectionByCode.get(r.section);
+    const sectionLabel = sec ? `<span class="badge badge-primary">${r.section}</span>` : r.section;
 
     return `<tr>
-      <td class="code">${esc(code)}</td>
-      <td>${esc(item[4])}</td>
+      <td class="code">${esc(r.code)}</td>
+      <td>${esc(r.name)}</td>
       <td>${sectionLabel}</td>
-      <td class="fs-12 text-muted">${esc(item[5]||'')}</td>
-      ${d(ceilT,bt)}
-      <td class="num"${bth}><span style="${colorT}">${pt!=null?fmtPrice(pt):'—'}</span></td>
-      ${d(peerAvgT,bt)}${d(provAvgT,bt)}${d(regAvgT,bt)}
-      ${d(ceilF,bf)}
-      <td class="num"${bfh}><span style="${colorF}">${pf!=null?fmtPrice(pf):'—'}</span></td>
-      ${d(peerAvgF,bf)}${d(provAvgF,bf)}${d(regAvgF,bf)}
+      <td class="fs-12 text-muted">${esc(r.unit)}</td>
+      ${d(r.ceilT,bt)}
+      <td class="num"${bth}><span style="${colorT}">${r.pt!=null?fmtPrice(r.pt):'—'}</span></td>
+      ${d(r.peerAvgT,bt)}${d(r.provAvgT,bt)}${d(r.regAvgT,bt)}
+      ${d(r.ceilF,bf)}
+      <td class="num"${bfh}><span style="${colorF}">${r.pf!=null?fmtPrice(r.pf):'—'}</span></td>
+      ${d(r.peerAvgF,bf)}${d(r.provAvgF,bf)}${d(r.regAvgF,bf)}
     </tr>`;
   }).join('') || `<tr><td colspan="14" class="empty-state">ไม่มีรายการที่มีราคา</td></tr>`;
 
   document.getElementById('hosp-tbody').innerHTML = tbody;
   document.getElementById('hosp-footer').textContent =
-    `${esc(h.name)} — แสดง ${items.length.toLocaleString()} รายการที่มีราคา`;
+    `${esc(h.name)} — แสดง ${rows.length.toLocaleString()} รายการที่มีราคา`;
+  updateSortIndicators('#hosp-mode-table', state.hospSort);
 }
 
 /* ===================================================
@@ -1603,9 +1726,10 @@ function renderCompareTab() {
     } else {
       dropdown.innerHTML = matches.map(h => {
         const isSelected = state.selectedHosps.some(s => s.hcode === h.hcode);
+        const hist = submissionHistory(h.hcode);
         return `<div class="hosp-option ${isSelected ? 'selected' : ''}" data-hcode="${h.hcode}">
           <div class="hosp-option-name">${esc(h.name)}</div>
-          <div class="hosp-option-meta">${h.hcode} | ${h.province} | ${h.level || '—'}</div>
+          <div class="hosp-option-meta">${h.hcode} | ${h.province} | ${h.level || '—'} | ยื่น: ${hist.length ? hist.join(', ') : '—'}</div>
         </div>`;
       }).join('');
 
