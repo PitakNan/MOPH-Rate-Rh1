@@ -750,7 +750,7 @@ tr:last-child td { border-bottom: none; }
                 <th class="num">ยื่น 1/2568</th>
                 <th class="num">ยื่น 1/2569</th>
                 <th class="num">ยื่น 2/2569</th>
-                <th style="width:120px" title="สัดส่วนของ รพ.ที่ยื่นในปี 2569 เทียบกับ รพ.ทั้งเขต">% ต่อ รพ.ทั้งเขต (2569)</th>
+                <th style="width:120px" title="(ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในจังหวัดนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
               </tr>
             </thead>
             <tbody id="prov-tbody"></tbody>
@@ -768,7 +768,7 @@ tr:last-child td { border-bottom: none; }
                 <th class="num">ยื่น 1/2568</th>
                 <th class="num">ยื่น 1/2569</th>
                 <th class="num">ยื่น 2/2569</th>
-                <th class="num" title="สัดส่วนของ รพ.ที่ยื่นในปี 2569 เทียบกับ รพ.ทั้งเขต">% ต่อ รพ.ทั้งเขต (2569)</th>
+                <th class="num" title="(ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในระดับนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
               </tr>
             </thead>
             <tbody id="level-tbody"></tbody>
@@ -1185,25 +1185,24 @@ function renderOverview() {
 
 function renderProvinceTable() {
   const provinces = [...idx.hospitalsByProvince.keys()].sort();
-  const subY69 = idx.submittedByYear.get(2569) ?? new Set();   // ปี 2569 รวมทุกรอบ (ใช้คิดสัดส่วน)
   const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
   const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
   const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
-  const totalN = idx.hospitalByHcode.size; // รพ.ทั้งหมดทั้งเขต (ตัวหารคงที่ทุกแถว)
-  const maxSub = Math.max(...provinces.map(p => {
-    return (idx.hospitalsByProvince.get(p) || []).filter(h => subY69.has(h)).length;
-  }));
+  const sumRoundsOf = hcodes => hcodes.filter(h => s68r1.has(h)).length
+    + hcodes.filter(h => s69r1.has(h)).length
+    + hcodes.filter(h => s69r2.has(h)).length;
+  const maxSub = Math.max(...provinces.map(p => sumRoundsOf(idx.hospitalsByProvince.get(p) || [])));
 
   const tbody = document.getElementById('prov-tbody');
   tbody.innerHTML = provinces.map(prov => {
     const hcodes = idx.hospitalsByProvince.get(prov) || [];
     const n = hcodes.length;
-    const y69 = hcodes.filter(h => subY69.has(h)).length;
     const r68 = hcodes.filter(h => s68r1.has(h)).length;
     const r691 = hcodes.filter(h => s69r1.has(h)).length;
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
-    const pct = totalN > 0 ? Math.round(y69 / totalN * 100) : 0;
-    const barW = maxSub > 0 ? Math.round(y69 / maxSub * 100) : 0;
+    const sumRounds = r68 + r691 + r692;
+    const pct = n > 0 ? Math.round(sumRounds / n * 100) : 0;
+    const barW = maxSub > 0 ? Math.round(sumRounds / maxSub * 100) : 0;
     return `<tr>
       <td>${prov}</td>
       <td class="num">${n}</td>
@@ -1217,21 +1216,19 @@ function renderProvinceTable() {
 
 function renderLevelTable() {
   const levels = [...idx.hospitalsByLevel.keys()].sort();
-  const subY69 = idx.submittedByYear.get(2569) ?? new Set();
   const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
   const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
   const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
-  const totalN = idx.hospitalByHcode.size; // รพ.ทั้งหมดทั้งเขต (ตัวหารคงที่ทุกแถว)
 
   const tbody = document.getElementById('level-tbody');
   tbody.innerHTML = levels.map(lv => {
     const hcodes = idx.hospitalsByLevel.get(lv) || [];
     const n = hcodes.length;
-    const y69 = hcodes.filter(h => subY69.has(h)).length;
     const r68 = hcodes.filter(h => s68r1.has(h)).length;
     const r691 = hcodes.filter(h => s69r1.has(h)).length;
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
-    const pct = totalN > 0 ? Math.round(y69 / totalN * 100) : 0;
+    const sumRounds = r68 + r691 + r692;
+    const pct = n > 0 ? Math.round(sumRounds / n * 100) : 0;
     return `<tr>
       <td>${lv || '(ไม่ระบุ)'}</td>
       <td class="num">${n}</td>
