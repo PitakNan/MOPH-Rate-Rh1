@@ -640,6 +640,7 @@ tr:last-child td { border-bottom: none; }
 <script src="data/dim_item.js?v=202607201558"></script>
 <script src="data/dim_hospital.js?v=202607201558"></script>
 <script src="data/fact_price.js?v=202607201558"></script>
+<script src="data/no_service_hcodes.js?v=202607221100"></script>
 
 <!-- LOADING OVERLAY -->
 <div id="loading-overlay">
@@ -747,10 +748,11 @@ tr:last-child td { border-bottom: none; }
               <tr>
                 <th>จังหวัด</th>
                 <th class="num">รพ.ทั้งหมด</th>
+                <th class="num" title="เสร็จสิ้น (ไม่มีการให้บริการ) — สถานะ 6 จากระบบติดตาม ไม่ต้องยื่นราคา">ไม่มีบริการ</th>
                 <th class="num">ยื่น 1/2568</th>
                 <th class="num">ยื่น 1/2569</th>
                 <th class="num">ยื่น 2/2569</th>
-                <th style="width:120px" title="(ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในจังหวัดนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
+                <th style="width:120px" title="(ไม่มีบริการ + ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในจังหวัดนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
               </tr>
             </thead>
             <tbody id="prov-tbody"></tbody>
@@ -765,10 +767,11 @@ tr:last-child td { border-bottom: none; }
               <tr>
                 <th>ระดับ</th>
                 <th class="num">รพ.ทั้งหมด</th>
+                <th class="num" title="เสร็จสิ้น (ไม่มีการให้บริการ) — สถานะ 6 จากระบบติดตาม ไม่ต้องยื่นราคา">ไม่มีบริการ</th>
                 <th class="num">ยื่น 1/2568</th>
                 <th class="num">ยื่น 1/2569</th>
                 <th class="num">ยื่น 2/2569</th>
-                <th class="num" title="(ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในระดับนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
+                <th class="num" title="(ไม่มีบริการ + ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในระดับนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
               </tr>
             </thead>
             <tbody id="level-tbody"></tbody>
@@ -1014,6 +1017,7 @@ const idx = {
   itemByCode: new Map(),          // code_moph → item arr
   hospitalsByProvince: new Map(), // province → [hcodes]
   hospitalsByLevel: new Map(),    // level → [hcodes]
+  noServiceHcodes: new Set(),     // hcode ที่สถานะ = 6 "เสร็จสิ้น (ไม่มีการให้บริการ)" — จาก Google Sheet tracker (ดู docs/no_service_units_check.md)
   submittedByYear: new Map(),     // year → Set of hcodes (for overview tab only)
   submittedByRound: new Map(),    // `${round}/${year}` → Set of hcodes (แยกรายรอบ เช่น '1/2569', '2/2569')
   sectionByCode: new Map(),       // section_code → section obj
@@ -1071,6 +1075,9 @@ function buildIndexes() {
       if (!idx.hospitalsByLevel.has(h.level))
         idx.hospitalsByLevel.set(h.level, []);
       idx.hospitalsByLevel.get(h.level).push(h.hcode);
+    }
+    if (typeof NO_SERVICE_HCODES !== 'undefined') {
+      for (const hcode of NO_SERVICE_HCODES) idx.noServiceHcodes.add(hcode);
     }
 
     // Section index
@@ -1188,7 +1195,8 @@ function renderProvinceTable() {
   const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
   const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
   const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
-  const sumRoundsOf = hcodes => hcodes.filter(h => s68r1.has(h)).length
+  const sumRoundsOf = hcodes => hcodes.filter(h => idx.noServiceHcodes.has(h)).length
+    + hcodes.filter(h => s68r1.has(h)).length
     + hcodes.filter(h => s69r1.has(h)).length
     + hcodes.filter(h => s69r2.has(h)).length;
   const maxSub = Math.max(...provinces.map(p => sumRoundsOf(idx.hospitalsByProvince.get(p) || [])));
@@ -1197,15 +1205,17 @@ function renderProvinceTable() {
   tbody.innerHTML = provinces.map(prov => {
     const hcodes = idx.hospitalsByProvince.get(prov) || [];
     const n = hcodes.length;
+    const noService = hcodes.filter(h => idx.noServiceHcodes.has(h)).length;
     const r68 = hcodes.filter(h => s68r1.has(h)).length;
     const r691 = hcodes.filter(h => s69r1.has(h)).length;
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
-    const sumRounds = r68 + r691 + r692;
+    const sumRounds = noService + r68 + r691 + r692;
     const pct = n > 0 ? Math.round(sumRounds / n * 100) : 0;
     const barW = maxSub > 0 ? Math.round(sumRounds / maxSub * 100) : 0;
     return `<tr>
       <td>${prov}</td>
       <td class="num">${n}</td>
+      <td class="num">${noService}</td>
       <td class="num">${r68}</td>
       <td class="num">${r691}</td>
       <td class="num"><strong>${r692}</strong></td>
@@ -1224,14 +1234,16 @@ function renderLevelTable() {
   tbody.innerHTML = levels.map(lv => {
     const hcodes = idx.hospitalsByLevel.get(lv) || [];
     const n = hcodes.length;
+    const noService = hcodes.filter(h => idx.noServiceHcodes.has(h)).length;
     const r68 = hcodes.filter(h => s68r1.has(h)).length;
     const r691 = hcodes.filter(h => s69r1.has(h)).length;
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
-    const sumRounds = r68 + r691 + r692;
+    const sumRounds = noService + r68 + r691 + r692;
     const pct = n > 0 ? Math.round(sumRounds / n * 100) : 0;
     return `<tr>
       <td>${lv || '(ไม่ระบุ)'}</td>
       <td class="num">${n}</td>
+      <td class="num">${noService}</td>
       <td class="num">${r68}</td>
       <td class="num">${r691}</td>
       <td class="num"><strong>${r692}</strong></td>
