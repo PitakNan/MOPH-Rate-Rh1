@@ -1189,6 +1189,7 @@ function renderProvinceTable() {
   const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
   const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
   const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
+  const totalN = idx.hospitalByHcode.size; // รพ.ทั้งหมดทั้งเขต (ตัวหารคงที่ทุกแถว)
   const maxSub = Math.max(...provinces.map(p => {
     return (idx.hospitalsByProvince.get(p) || []).filter(h => subY69.has(h)).length;
   }));
@@ -1201,7 +1202,7 @@ function renderProvinceTable() {
     const r68 = hcodes.filter(h => s68r1.has(h)).length;
     const r691 = hcodes.filter(h => s69r1.has(h)).length;
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
-    const pct = n > 0 ? Math.round(y69 / n * 100) : 0;
+    const pct = totalN > 0 ? Math.round(y69 / totalN * 100) : 0;
     const barW = maxSub > 0 ? Math.round(y69 / maxSub * 100) : 0;
     return `<tr>
       <td>${prov}</td>
@@ -1220,6 +1221,7 @@ function renderLevelTable() {
   const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
   const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
   const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
+  const totalN = idx.hospitalByHcode.size; // รพ.ทั้งหมดทั้งเขต (ตัวหารคงที่ทุกแถว)
 
   const tbody = document.getElementById('level-tbody');
   tbody.innerHTML = levels.map(lv => {
@@ -1229,14 +1231,14 @@ function renderLevelTable() {
     const r68 = hcodes.filter(h => s68r1.has(h)).length;
     const r691 = hcodes.filter(h => s69r1.has(h)).length;
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
-    const pct = n > 0 ? Math.round(y69 / n * 100) : 0;
+    const pct = totalN > 0 ? Math.round(y69 / totalN * 100) : 0;
     return `<tr>
       <td>${lv || '(ไม่ระบุ)'}</td>
       <td class="num">${n}</td>
       <td class="num">${r68}</td>
       <td class="num">${r691}</td>
       <td class="num"><strong>${r692}</strong></td>
-      <td class="num"><span class="badge badge-${pct >= 80 ? 'success' : pct >= 50 ? 'warning' : 'danger'}">${pct}%</span></td>
+      <td class="num"><span class="badge badge-primary">${pct}%</span></td>
     </tr>`;
   }).join('');
 }
