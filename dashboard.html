@@ -427,6 +427,43 @@ tr:last-child td { border-bottom: none; }
 .panel-stat-label { color: var(--gray-600); }
 .panel-stat-val { font-weight: 600; color: var(--text); }
 
+/* ===== DRILL PANEL (สถิติรายจังหวัด / รายระดับ) ===== */
+#drill-panel {
+  position: fixed;
+  right: 0; top: 60px; bottom: 0;
+  width: 420px;
+  background: #fff;
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 20px rgba(0,0,0,.1);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .3s ease;
+}
+#drill-panel.open { transform: translateX(0); }
+.drill-cell { cursor: pointer; }
+.drill-cell:hover { text-decoration: underline; text-decoration-style: dotted; }
+.drill-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 13px;
+}
+.drill-item:last-child { border-bottom: none; }
+.drill-item-name { font-weight: 500; }
+.drill-item-code { color: var(--gray-500); font-size: 11px; }
+.drill-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-top: 4px;
+  margin-right: 4px;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+.drill-badge-warn { background: #fdecea; color: var(--danger); font-weight: 600; }
+
 /* ===== HOSPITAL COMPARISON TAB ===== */
 .hospital-selector-wrap {
   position: relative;
@@ -576,7 +613,7 @@ tr:last-child td { border-bottom: none; }
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .chart-grid, .overview-tables { grid-template-columns: 1fr; }
-  #detail-panel { width: 100%; top: 0; }
+  #detail-panel, #drill-panel { width: 100%; top: 0; }
   .search-input-lg { width: 220px; }
 }
 
@@ -778,6 +815,19 @@ tr:last-child td { border-bottom: none; }
           </table>
         </div>
       </div>
+    </div>
+
+    <!-- DRILL PANEL OVERLAY (คลิกตัวเลขในตารางเพื่อดูรายชื่อ รพ.) -->
+    <div id="drill-overlay" onclick="closeDrillPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:89;"></div>
+    <div id="drill-panel">
+      <div class="panel-header">
+        <div class="panel-header-content">
+          <div class="panel-title" id="drill-title">—</div>
+          <div class="panel-sub" id="drill-sub">—</div>
+        </div>
+        <button class="panel-close" onclick="closeDrillPanel()" title="ปิด">&#10005;</button>
+      </div>
+      <div class="panel-body" id="drill-body"></div>
     </div>
 
   </div><!-- /tab-overview -->
@@ -1212,13 +1262,14 @@ function renderProvinceTable() {
     const sumRounds = noService + r68 + r691 + r692;
     const pct = n > 0 ? Math.round(sumRounds / n * 100) : 0;
     const barW = maxSub > 0 ? Math.round(sumRounds / maxSub * 100) : 0;
+    const k = JSON.stringify(prov);
     return `<tr>
       <td>${prov}</td>
-      <td class="num">${n}</td>
-      <td class="num">${noService}</td>
-      <td class="num">${r68}</td>
-      <td class="num">${r691}</td>
-      <td class="num"><strong>${r692}</strong></td>
+      <td class="num drill-cell" onclick='showDrill("province", ${k}, "total")'>${n}</td>
+      <td class="num drill-cell" onclick='showDrill("province", ${k}, "noService")'>${noService}</td>
+      <td class="num drill-cell" onclick='showDrill("province", ${k}, "r68")'>${r68}</td>
+      <td class="num drill-cell" onclick='showDrill("province", ${k}, "r691")'>${r691}</td>
+      <td class="num drill-cell" onclick='showDrill("province", ${k}, "r692")'><strong>${r692}</strong></td>
       <td><span class="prov-bar" style="width:${barW}px"></span> <span class="fs-12 text-muted">${pct}%</span></td>
     </tr>`;
   }).join('');
@@ -1240,16 +1291,85 @@ function renderLevelTable() {
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
     const sumRounds = noService + r68 + r691 + r692;
     const pct = n > 0 ? Math.round(sumRounds / n * 100) : 0;
+    const k = JSON.stringify(lv);
     return `<tr>
       <td>${lv || '(ไม่ระบุ)'}</td>
-      <td class="num">${n}</td>
-      <td class="num">${noService}</td>
-      <td class="num">${r68}</td>
-      <td class="num">${r691}</td>
-      <td class="num"><strong>${r692}</strong></td>
+      <td class="num drill-cell" onclick='showDrill("level", ${k}, "total")'>${n}</td>
+      <td class="num drill-cell" onclick='showDrill("level", ${k}, "noService")'>${noService}</td>
+      <td class="num drill-cell" onclick='showDrill("level", ${k}, "r68")'>${r68}</td>
+      <td class="num drill-cell" onclick='showDrill("level", ${k}, "r691")'>${r691}</td>
+      <td class="num drill-cell" onclick='showDrill("level", ${k}, "r692")'><strong>${r692}</strong></td>
       <td class="num"><span class="badge badge-primary">${pct}%</span></td>
     </tr>`;
   }).join('');
+}
+
+/* ===================================================
+   DRILL PANEL — คลิกตัวเลขในตาราง สถิติรายจังหวัด/รายระดับ
+   =================================================== */
+function showDrill(kind, key, cellType) {
+  const hcodes = kind === 'province'
+    ? (idx.hospitalsByProvince.get(key) || [])
+    : (idx.hospitalsByLevel.get(key) || []);
+
+  const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
+  const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
+  const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
+
+  const cellLabels = { total: 'รพ.ทั้งหมด', noService: 'ไม่มีบริการ', r68: 'ยื่น 1/2568', r691: 'ยื่น 1/2569', r692: 'ยื่น 2/2569' };
+  const tagDefs = [
+    { key: 'noService', label: 'ไม่มีบริการ', test: h => idx.noServiceHcodes.has(h) },
+    { key: 'r68',       label: 'ยื่น 1/2568', test: h => s68r1.has(h) },
+    { key: 'r691',      label: 'ยื่น 1/2569', test: h => s69r1.has(h) },
+    { key: 'r692',      label: 'ยื่น 2/2569', test: h => s69r2.has(h) },
+  ];
+
+  const filtered = cellType === 'total'
+    ? hcodes.slice()
+    : hcodes.filter(h => tagDefs.find(t => t.key === cellType).test(h));
+
+  filtered.sort((a, b) => {
+    const ha = idx.hospitalByHcode.get(a), hb = idx.hospitalByHcode.get(b);
+    return (ha?.name || '').localeCompare(hb?.name || '', 'th');
+  });
+
+  document.getElementById('drill-title').textContent = `${key || '(ไม่ระบุ)'} — ${cellLabels[cellType]}`;
+  document.getElementById('drill-sub').textContent = `${filtered.length} แห่ง`;
+
+  const body = filtered.map(hcode => {
+    const h = idx.hospitalByHcode.get(hcode);
+    const name = h ? h.name : hcode;
+    const matchedTags = tagDefs.filter(t => t.test(hcode));
+    const otherTags = matchedTags.filter(t => t.key !== cellType);
+    const badges = matchedTags.map(t => {
+      const isOther = cellType !== 'total' && t.key !== cellType;
+      return `<span class="drill-badge${isOther ? ' drill-badge-warn' : ''}">${isOther ? '⚠ ' : ''}${t.label}</span>`;
+    }).join('');
+    const note = (cellType !== 'total' && otherTags.length > 0)
+      ? `<div style="color:var(--danger);font-size:11px;margin-top:2px;">หมายเหตุ: ยื่นรอบอื่นแล้ว (${otherTags.map(t => t.label).join(', ')})</div>`
+      : '';
+    return `<div class="drill-item">
+      <div class="drill-item-name">${esc(name)}</div>
+      <div class="drill-item-code">${esc(hcode)}</div>
+      <div>${badges}</div>
+      ${note}
+    </div>`;
+  }).join('');
+
+  document.getElementById('drill-body').innerHTML = body || '<div class="text-muted">ไม่มีข้อมูล</div>';
+  document.getElementById('drill-overlay').style.display = 'block';
+  document.getElementById('drill-panel').classList.add('open');
+  document.addEventListener('keydown', _escCloseDrill);
+}
+
+function _escCloseDrill(e) {
+  if (e.key === 'Escape') closeDrillPanel();
+}
+
+function closeDrillPanel() {
+  document.getElementById('drill-panel').classList.remove('open');
+  document.getElementById('drill-overlay').style.display = 'none';
+  document.removeEventListener('keydown', _escCloseDrill);
 }
 
 function renderCharts() {
