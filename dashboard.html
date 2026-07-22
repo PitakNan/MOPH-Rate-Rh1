@@ -600,14 +600,22 @@ tr:last-child td { border-bottom: none; }
 .comp-table th.avg-col  { background: #eafaf1; color: var(--accent); min-width: 90px; }
 
 /* ===== PROVINCE TABLE ===== */
-.prov-bar {
+.pct-bar-track {
+  width: 70px;
   height: 12px;
-  background: var(--primary);
+  background: var(--gray-100);
   border-radius: 3px;
-  min-width: 4px;
-  transition: width .4s ease;
   display: inline-block;
   vertical-align: middle;
+  overflow: hidden;
+}
+.pct-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width .4s ease;
+  display: block;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -789,7 +797,7 @@ tr:last-child td { border-bottom: none; }
                 <th class="num">ยื่น 1/2568</th>
                 <th class="num">ยื่น 1/2569</th>
                 <th class="num">ยื่น 2/2569</th>
-                <th style="width:120px" title="(ไม่มีบริการ + ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในจังหวัดนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
+                <th style="width:120px" title="(ไม่มีบริการ + ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในจังหวัดนั้น">% ยื่นสะสม</th>
               </tr>
             </thead>
             <tbody id="prov-tbody"></tbody>
@@ -808,7 +816,7 @@ tr:last-child td { border-bottom: none; }
                 <th class="num">ยื่น 1/2568</th>
                 <th class="num">ยื่น 1/2569</th>
                 <th class="num">ยื่น 2/2569</th>
-                <th class="num" title="(ไม่มีบริการ + ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในระดับนั้น">% ยื่นสะสม (รวม 3 รอบ)</th>
+                <th style="width:120px" title="(ไม่มีบริการ + ยื่น 1/2568 + 1/2569 + 2/2569) หารด้วย รพ.ทั้งหมดในระดับนั้น">% ยื่นสะสม</th>
               </tr>
             </thead>
             <tbody id="level-tbody"></tbody>
@@ -1245,12 +1253,6 @@ function renderProvinceTable() {
   const s68r1 = idx.submittedByRound.get('1/2568') ?? new Set();
   const s69r1 = idx.submittedByRound.get('1/2569') ?? new Set();
   const s69r2 = idx.submittedByRound.get('2/2569') ?? new Set();
-  const sumRoundsOf = hcodes => hcodes.filter(h => idx.noServiceHcodes.has(h)).length
-    + hcodes.filter(h => s68r1.has(h)).length
-    + hcodes.filter(h => s69r1.has(h)).length
-    + hcodes.filter(h => s69r2.has(h)).length;
-  const maxSub = Math.max(...provinces.map(p => sumRoundsOf(idx.hospitalsByProvince.get(p) || [])));
-
   const tbody = document.getElementById('prov-tbody');
   tbody.innerHTML = provinces.map(prov => {
     const hcodes = idx.hospitalsByProvince.get(prov) || [];
@@ -1261,7 +1263,6 @@ function renderProvinceTable() {
     const r692 = hcodes.filter(h => s69r2.has(h)).length;
     const sumRounds = noService + r68 + r691 + r692;
     const pct = n > 0 ? Math.round(sumRounds / n * 100) : 0;
-    const barW = maxSub > 0 ? Math.round(sumRounds / maxSub * 100) : 0;
     const k = JSON.stringify(prov);
     return `<tr>
       <td>${prov}</td>
@@ -1270,7 +1271,7 @@ function renderProvinceTable() {
       <td class="num drill-cell" onclick='showDrill("province", ${k}, "r68")'>${r68}</td>
       <td class="num drill-cell" onclick='showDrill("province", ${k}, "r691")'>${r691}</td>
       <td class="num drill-cell" onclick='showDrill("province", ${k}, "r692")'><strong>${r692}</strong></td>
-      <td><span class="prov-bar" style="width:${barW}px"></span> <span class="fs-12 text-muted">${pct}%</span></td>
+      <td><span class="pct-bar-track"><span class="pct-bar-fill" style="width:${pct}%"></span></span> <span class="fs-12 text-muted">${pct}%</span></td>
     </tr>`;
   }).join('');
 }
@@ -1299,7 +1300,7 @@ function renderLevelTable() {
       <td class="num drill-cell" onclick='showDrill("level", ${k}, "r68")'>${r68}</td>
       <td class="num drill-cell" onclick='showDrill("level", ${k}, "r691")'>${r691}</td>
       <td class="num drill-cell" onclick='showDrill("level", ${k}, "r692")'><strong>${r692}</strong></td>
-      <td class="num"><span class="badge badge-primary">${pct}%</span></td>
+      <td><span class="pct-bar-track"><span class="pct-bar-fill" style="width:${pct}%"></span></span> <span class="fs-12 text-muted">${pct}%</span></td>
     </tr>`;
   }).join('');
 }
