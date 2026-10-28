@@ -1,31 +1,87 @@
 let allUnits = [];
 let currentProvince = 'all';
 
-// Google Apps Script API URL - ดึงข้อมูลจาก Google Sheet
+// Google Apps Script API — แหล่งข้อมูลจริงเพียงแหล่งเดียวของระบบ (แก้ไขข้อมูลที่ Google Sheet โดยตรง)
 const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbxRA6nelIcu7EhHX7Et-aBLCr9tgQu00zYFz619ocKeFrvDTb__hfsXa08Q2ItW99Zd/exec';
 
-// Store data hash for comparison
-let lastDataHash = null;
+// cache ไว้แสดงผลตอน Apps Script ล่ม/ช้า เท่านั้น — ไม่ใช่ที่เก็บข้อมูลแก้ไข
+const CACHE_KEY = 'moph_rates_cache';
+const CACHE_TIME_KEY = 'moph_rates_cache_time';
 
-// Load data from Google Sheet
-async function loadDataFromGoogleSheet() {
+// Apps Script ตอบกลับช้า 4-10 วิ และส่ง no-store ทุกครั้ง (cache ชั้นไหนก็ไม่ช่วย)
+// ความถี่นี้จึงเท่ากับจำนวนครั้งที่สคริปต์ถูกรันจริง — อย่าลดต่ำกว่านี้โดยไม่วัดผลก่อน
+const REFRESH_INTERVAL = 90000;
+
+let lastDataHash = null;
+let lastFetchAt = 0;
+let refreshTimer = null;
+
+// --- Data Loading ---
+
+async function fetchFromSheet() {
+    const res = await fetch(GOOGLE_SHEET_API, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) throw new Error('ข้อมูลที่ได้รับว่างเปล่า');
+    return data;
+}
+
+function readCache() {
     try {
-        const response = await fetch(GOOGLE_SHEET_API);
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error('ไม่สามารถดึงข้อมูลจาก Google Sheet:', error);
-        // Fallback to localStorage if API fails
-        const localData = localStorage.getItem('moph_rates_db');
-        if (localData) {
-            console.log('ใช้ข้อมูลจาก LocalStorage');
-            return JSON.parse(localData);
-        }
-        return [];
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data) || data.length === 0) return null;
+        return { data, time: localStorage.getItem(CACHE_TIME_KEY) };
+    } catch (err) {
+        console.warn('อ่าน cache ไม่สำเร็จ:', err);
+        return null;
     }
 }
 
-// Calculate hash of data for change detection
+function writeCache(data) {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(CACHE_TIME_KEY, new Date().toISOString());
+    } catch (err) {
+        console.warn('เขียน cache ไม่สำเร็จ:', err);
+    }
+}
+
+async function loadData(isInitial = false) {
+    try {
+        const data = await fetchFromSheet();
+        lastFetchAt = Date.now();
+        writeCache(data);
+
+        const hash = calculateDataHash(data);
+        if (isInitial || hash !== lastDataHash) {
+            allUnits = data;
+            lastDataHash = hash;
+            renderAll();
+        }
+        setDataStatus('live', new Date().toISOString());
+    } catch (err) {
+        console.error('ดึงข้อมูลจาก Google Sheet ไม่สำเร็จ:', err);
+
+        if (!isInitial) {
+            setDataStatus('stale', localStorage.getItem(CACHE_TIME_KEY));
+            return;
+        }
+
+        const cached = readCache();
+        if (cached) {
+            allUnits = cached.data;
+            lastDataHash = calculateDataHash(allUnits);
+            renderAll();
+            setDataStatus('cache', cached.time);
+        } else {
+            setDataStatus('error', null);
+            showTableMessage('❌ โหลดข้อมูลไม่สำเร็จ และไม่มีข้อมูลสำรองในเครื่องนี้ — กรุณารีเฟรชหน้าอีกครั้ง');
+        }
+    }
+}
+
 function calculateDataHash(data) {
     return JSON.stringify(data).split('').reduce((a, b) => {
         a = ((a << 5) - a) + b.charCodeAt(0);
@@ -33,109 +89,95 @@ function calculateDataHash(data) {
     }, 0).toString();
 }
 
-// Refresh data from Google Sheet periodically
 function startAutoRefresh() {
-    setInterval(async () => {
-        try {
-            const newData = await loadDataFromGoogleSheet();
-            if (newData && newData.length > 0) {
-                const newHash = calculateDataHash(newData);
+    if (refreshTimer) clearInterval(refreshTimer);
 
-                if (newHash !== lastDataHash) {
-                    console.log('🔄 ตรวจพบการเปลี่ยนแปลงข้อมูล - อัปเดต Dashboard');
-                    allUnits = newData;
-                    localStorage.setItem('moph_rates_db', JSON.stringify(allUnits));
-                    lastDataHash = newHash;
+    refreshTimer = setInterval(() => {
+        if (document.hidden) return; // แท็บไม่ได้เปิดอยู่ ไม่ต้องรบกวน Apps Script
+        loadData();
+    }, REFRESH_INTERVAL);
 
-                    // Re-render dashboard
-                    if (document.getElementById('total-units')) {
-                        updateStats();
-                        initProvinceCards();
-                        renderTable();
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Auto-refresh error:', error);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && Date.now() - lastFetchAt > REFRESH_INTERVAL) {
+            loadData();
         }
-    }, 15000); // Check every 15 seconds
+    });
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    // Load from Google Sheet
-    const sheetData = await loadDataFromGoogleSheet();
+// --- Data Status Badge ---
 
-    if (sheetData && sheetData.length > 0) {
-        allUnits = sheetData;
+function formatThaiDateTime(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
+    const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543} ${hh}:${mm} น.`;
+}
 
-        // Load and merge local modifications if any
-        const localData = localStorage.getItem('moph_rates_db');
-        if (localData) {
-            const parsedLocal = JSON.parse(localData);
-            allUnits.forEach(u => {
-                const localUnit = parsedLocal.find(l => l.name === u.name);
-                if (localUnit && localUnit.status > 0) {
-                    // Only merge if there are changes in localStorage
-                    if (localUnit.status !== undefined) u.status = localUnit.status;
-                    if (localUnit.startDate) u.startDate = localUnit.startDate;
-                    if (localUnit.updateDate) u.updateDate = localUnit.updateDate;
-                    if (localUnit.fileLink) u.fileLink = localUnit.fileLink;
-                }
-            });
-            localStorage.setItem('moph_rates_db', JSON.stringify(allUnits));
-            console.log('✓ ดึงข้อมูล ' + allUnits.length + ' รายการจาก Google Sheet');
-        } else {
-            console.log('✓ ดึงข้อมูล ' + allUnits.length + ' รายการจาก Google Sheet (ไม่มีข้อมูลท้องถิ่น)');
-        }
-    } else {
-        console.warn('ไม่มีข้อมูลจาก Google Sheet, กำลังใช้ LocalStorage');
-        const localData = localStorage.getItem('moph_rates_db');
-        if (localData) {
-            allUnits = JSON.parse(localData);
-            console.log('✓ ดึงข้อมูล ' + allUnits.length + ' รายการจาก LocalStorage');
-        }
-    }
+function setDataStatus(state, iso) {
+    const el = document.getElementById('data-status');
+    if (!el) return;
 
-    // Calculate initial hash
-    lastDataHash = calculateDataHash(allUnits);
+    const when = formatThaiDateTime(iso);
+    const states = {
+        loading: ['ds-loading', '⏳ กำลังโหลดข้อมูลจาก Google Sheet...'],
+        live: ['ds-live', `🟢 ข้อมูลล่าสุดจาก Google Sheet ณ ${when}`],
+        cache: ['ds-cache', `🟡 เชื่อมต่อ Google Sheet ไม่สำเร็จ — กำลังแสดงข้อมูลสำรองในเครื่อง ณ ${when}`],
+        stale: ['ds-cache', `🟡 รีเฟรชล่าสุดไม่สำเร็จ — ข้อมูลที่แสดงอยู่คือ ณ ${when}`],
+        error: ['ds-error', '🔴 โหลดข้อมูลไม่สำเร็จ และไม่มีข้อมูลสำรองในเครื่องนี้']
+    };
 
-    if (document.getElementById('total-units')) {
-        initDashboard();
-    }
-    if (document.getElementById('unit-select')) {
-        initAdmin();
-    }
+    const [cls, text] = states[state] || states.error;
+    el.className = 'data-status ' + cls;
+    el.textContent = text;
+}
 
-    // Start auto-refresh
+// --- Initialize ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ล้าง cache รุ่นเก่าที่เคยปนข้อมูลที่แก้จาก Admin Panel ในเครื่อง (เลิกใช้แล้ว)
+    try { localStorage.removeItem('moph_rates_db'); } catch (err) { /* โหมดส่วนตัวอาจบล็อก */ }
+
+    if (!document.getElementById('total-units')) return;
+
+    initDashboard();
+    setDataStatus('loading', null);
+    showTableMessage('⏳ กำลังโหลดข้อมูลจาก Google Sheet...');
+    loadData(true);
     startAutoRefresh();
-    console.log('✓ Auto-refresh เปิดใช้งาน (ตรวจสอบทุก 15 วินาที)');
 });
 
 // --- Dashboard Logic ---
 
 function initDashboard() {
-    updateStats();
-    initProvinceCards();
-    renderTable();
-
-    // Add event listeners for optimized search & filter
     const searchInput = document.getElementById('search-input');
     const statusFilter = document.getElementById('status-filter');
-    
+
     if (searchInput) {
-        // Use debounce for typing to prevent lag
         searchInput.addEventListener('input', debounce(() => renderTable(), 250));
     }
     if (statusFilter) {
-        // Immediate update for dropdown
         statusFilter.addEventListener('change', () => renderTable());
     }
 }
 
+function renderAll() {
+    updateStats();
+    initProvinceCards();
+    renderTable();
+}
+
+function showTableMessage(msg) {
+    const tbody = document.getElementById('table-body');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:3rem; color:var(--text-muted); font-weight:600;">${msg}</td></tr>`;
+}
+
 function updateStats() {
-    const targetUnits = currentProvince === 'all' 
-        ? allUnits 
+    const targetUnits = currentProvince === 'all'
+        ? allUnits
         : allUnits.filter(u => u.province === currentProvince);
 
     const total = targetUnits.length;
@@ -155,10 +197,10 @@ function initProvinceCards() {
     const provinceGrid = document.getElementById('province-grid');
     if (!provinceGrid) return;
 
-    const provinces = [...new Set(allUnits.map(u => u.province))].filter(p => p && p !== 'None' && p !== 'ѧѴ').sort();
-    
+    const provinces = [...new Set(allUnits.map(u => u.province))].filter(p => p && p !== 'None').sort();
+
     provinceGrid.innerHTML = '';
-    
+
     // "All" Card
     const allCard = createProvCard('ทุกจังหวัด', allUnits, 'all');
     provinceGrid.appendChild(allCard);
@@ -173,7 +215,7 @@ function initProvinceCards() {
 function createProvCard(name, units, value) {
     const card = document.createElement('div');
     card.className = `province-card ${currentProvince === value ? 'active' : ''}`;
-    
+
     const notStarted = units.filter(u => !u.status || u.status == 0).length;
     const pending = units.filter(u => u.status >= 1 && (u.status <= 4 || u.status == 7)).length;
     const none = units.filter(u => u.status == 6).length;
@@ -188,7 +230,7 @@ function createProvCard(name, units, value) {
             <div class="p-stat done" style="color: var(--success); background: #e8f5e9; padding: 4px; border-radius: 4px;">✅ เสร็จสิ้น: ${done}</div>
         </div>
     `;
-    
+
     card.onclick = () => {
         currentProvince = value;
         document.querySelectorAll('.province-card').forEach(c => c.classList.remove('active'));
@@ -196,12 +238,9 @@ function createProvCard(name, units, value) {
         updateStats();
         renderTable();
     };
-    
+
     return card;
 }
-
-function handleSearch() { /* Handled by event listeners in initDashboard with debounce */ }
-function handleFilter() { /* Handled by event listeners in initDashboard */ }
 
 function renderTable() {
     const tbody = document.getElementById('table-body');
@@ -209,9 +248,9 @@ function renderTable() {
 
     const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
     const statusFilter = document.getElementById('status-filter').value;
-    
+
     tbody.innerHTML = '';
-    
+
     let filtered = allUnits.filter(u => {
         const matchProv = currentProvince === 'all' || u.province === currentProvince;
         const matchSearch = termMatches(u, searchTerm);
@@ -231,9 +270,16 @@ function renderTable() {
         return priority(b.status) - priority(a.status);
     });
 
+    if (filtered.length === 0) {
+        showTableMessage(allUnits.length === 0
+            ? '⏳ กำลังโหลดข้อมูลจาก Google Sheet...'
+            : '🔍 ไม่พบหน่วยบริการที่ตรงกับเงื่อนไขที่เลือก');
+        return;
+    }
+
     // Batch DOM updates using DocumentFragment
     const fragment = document.createDocumentFragment();
-    
+
     // Performance: Limit initial render to 250 rows if searching (keeps UI fluid)
     const displayLimit = searchTerm ? 250 : filtered.length;
     const itemsToShow = filtered.slice(0, displayLimit);
@@ -241,7 +287,7 @@ function renderTable() {
     itemsToShow.forEach(u => {
         const tr = document.createElement('tr');
         tr.className = 'animate-in';
-        
+
         let rateHtml = '';
         if (u.status == 3 || u.rate_total > 0) {
             const lThai = u.rate_lower_thai ?? u.rate_lower ?? 0;
@@ -250,7 +296,7 @@ function renderTable() {
             const lInter = u.rate_lower_inter ?? 0;
             const eInter = u.rate_equal_inter ?? 0;
             const hInter = u.rate_higher_inter ?? u.rate_inter_higher ?? 0;
-            
+
             rateHtml = `
                 <div class="rate-details">
                     <div class="rate-item" style="margin-bottom: 2px;">👤 <b>ไทย:</b> ต่ำกว่า: <span style="color:var(--success)">${lThai}</span>, เท่ากับ: <span style="color:var(--success)">${eThai}</span>, สูงกว่า: <span style="color:var(--danger)">${hThai}</span></div>
@@ -289,7 +335,7 @@ function renderTable() {
 // Utility: term matching
 function termMatches(u, term) {
     if (!term) return true;
-    return u.name.toLowerCase().includes(term) || 
+    return u.name.toLowerCase().includes(term) ||
            (u.code && u.code.includes(term)) ||
            u.province.toLowerCase().includes(term);
 }
@@ -319,223 +365,4 @@ function getStatusText(s) {
         '7. แจ้งแก้ไขข้อมูล'
     ];
     return texts[s] || 'Unknown';
-}
-
-// --- Admin Logic ---
-
-const ADMIN_HASH = '4510feeff0c6864d291fcef1d4f86a496684097b24435615aa7e2e99d4e99838'; // 053890238-40
-
-function login() {
-    const pass = document.getElementById('password').value;
-    const hash = CryptoJS.SHA256(pass).toString();
-    
-    if (hash === ADMIN_HASH) {
-        document.getElementById('login-section').style.display = 'none';
-        document.getElementById('admin-section').style.display = 'block';
-    } else {
-        document.getElementById('login-error').style.display = 'block';
-    }
-}
-
-function initAdmin() {
-    const input = document.getElementById('unit-select');
-    if (!input) return;
-
-    // Handle typing in the search box
-    input.addEventListener('input', (e) => handleAdminSearch(e.target.value));
-
-    // Handle clicking the input to show results if it has text
-    input.addEventListener('click', (e) => {
-        if (e.target.value.trim().length > 0) handleAdminSearch(e.target.value);
-    });
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e) => {
-        const results = document.getElementById('search-results');
-        if (results && !input.contains(e.target) && !results.contains(e.target)) {
-            results.style.display = 'none';
-        }
-    });
-
-    console.log('Admin search initialized with high-performance custom dropdown.');
-}
-
-function handleAdminSearch(query) {
-    const resultsContainer = document.getElementById('search-results');
-    if (!resultsContainer) return;
-
-    const term = query.toLowerCase().trim();
-    if (term.length === 0) {
-        resultsContainer.style.display = 'none';
-        return;
-    }
-
-    // High speed filtering with limit
-    const matches = allUnits.filter(u => 
-        u.name.toLowerCase().includes(term) || 
-        (u.code && u.code.includes(term)) ||
-        u.province.toLowerCase().includes(term)
-    ).slice(0, 20); // Limit to top 20 for performance
-
-    if (matches.length === 0) {
-        resultsContainer.innerHTML = '<div style="padding: 15px; color: #999; text-align: center;">❌ ไม่พบข้อมูลหน่วยบริการ</div>';
-    } else {
-        resultsContainer.innerHTML = matches.map(u => `
-            <div class="search-item" onclick="selectUnit('${u.name.replace(/'/g, "\\'")}')">
-                <div class="unit-info">
-                    <span class="unit-name-small">${u.name}</span>
-                    <span class="unit-meta-small">รหัส: ${u.code || '---'} | ${u.type || '-'}</span>
-                </div>
-                <div class="prov-tag">${u.province}</div>
-            </div>
-        `).join('');
-    }
-
-    resultsContainer.style.display = 'block';
-}
-
-function selectUnit(name) {
-    const input = document.getElementById('unit-select');
-    const resultsContainer = document.getElementById('search-results');
-    
-    input.value = name;
-    resultsContainer.style.display = 'none';
-    
-    // Trigger the loading of unit data
-    loadUnitData();
-}
-
-function loadUnitData() {
-    const name = document.getElementById('unit-select').value;
-    const unit = allUnits.find(u => u.name === name);
-    
-    if (unit) {
-        document.getElementById('unit-details').style.display = 'block';
-        document.getElementById('display-unit-name').innerHTML = `<span style="background:var(--primary); color:white; padding:4px 8px; border-radius:6px; font-size:0.9rem; margin-right:8px;">รหัส: ${unit.code || 'ไม่มี'}</span> ${unit.name}`;
-        document.getElementById('edit-status').value = unit.status || 0;
-        document.getElementById('edit-start-date').value = unit.startDate || '';
-        document.getElementById('edit-file-link').value = unit.fileLink || '';
-        
-        // Load rate details if exist
-        document.getElementById('edit-rate-total').value = unit.rate_total || 0;
-        document.getElementById('edit-rate-lower-thai').value = unit.rate_lower_thai ?? unit.rate_lower ?? 0;
-        document.getElementById('edit-rate-equal-thai').value = unit.rate_equal_thai ?? unit.rate_equal ?? 0;
-        document.getElementById('edit-rate-higher-thai').value = unit.rate_higher_thai ?? unit.rate_higher ?? 0;
-        document.getElementById('edit-rate-lower-inter').value = unit.rate_lower_inter || 0;
-        document.getElementById('edit-rate-equal-inter').value = unit.rate_equal_inter || 0;
-        document.getElementById('edit-rate-higher-inter').value = unit.rate_higher_inter ?? unit.rate_inter_higher ?? 0;
-    } else {
-        document.getElementById('unit-details').style.display = 'none';
-    }
-}
-
-function saveChange() {
-    const name = document.getElementById('unit-select').value;
-    const unitIndex = allUnits.findIndex(u => u.name === name);
-    
-    if (unitIndex !== -1) {
-        const newStatus = parseInt(document.getElementById('edit-status').value);
-        allUnits[unitIndex].status = newStatus;
-        allUnits[unitIndex].startDate = document.getElementById('edit-start-date').value;
-        allUnits[unitIndex].fileLink = document.getElementById('edit-file-link').value;
-        
-        let rTotal = parseInt(document.getElementById('edit-rate-total').value) || 0;
-        let rLowerThai = parseInt(document.getElementById('edit-rate-lower-thai').value) || 0;
-        let rEqualThai = parseInt(document.getElementById('edit-rate-equal-thai').value) || 0;
-        let rHigherThai = parseInt(document.getElementById('edit-rate-higher-thai').value) || 0;
-        let rLowerInter = parseInt(document.getElementById('edit-rate-lower-inter').value) || 0;
-        let rEqualInter = parseInt(document.getElementById('edit-rate-equal-inter').value) || 0;
-        let rHigherInter = parseInt(document.getElementById('edit-rate-higher-inter').value) || 0;
-        
-        // If status is 6 (ไม่มีการให้บริการ), reset rates to 0
-        if (newStatus === 6) {
-            rTotal = 0; rLowerThai = 0; rEqualThai = 0; rHigherThai = 0; rLowerInter = 0; rEqualInter = 0; rHigherInter = 0;
-            document.getElementById('edit-rate-total').value = 0;
-            document.getElementById('edit-rate-lower-thai').value = 0;
-            document.getElementById('edit-rate-equal-thai').value = 0;
-            document.getElementById('edit-rate-higher-thai').value = 0;
-            document.getElementById('edit-rate-lower-inter').value = 0;
-            document.getElementById('edit-rate-equal-inter').value = 0;
-            document.getElementById('edit-rate-higher-inter').value = 0;
-        }
-
-        // Save rate details
-        allUnits[unitIndex].rate_total = rTotal;
-        allUnits[unitIndex].rate_lower_thai = rLowerThai;
-        allUnits[unitIndex].rate_equal_thai = rEqualThai;
-        allUnits[unitIndex].rate_higher_thai = rHigherThai;
-        allUnits[unitIndex].rate_lower_inter = rLowerInter;
-        allUnits[unitIndex].rate_equal_inter = rEqualInter;
-        allUnits[unitIndex].rate_higher_inter = rHigherInter;
-        
-        // Unset old properties to avoid conflicts over time
-        delete allUnits[unitIndex].rate_lower;
-        delete allUnits[unitIndex].rate_equal;
-        delete allUnits[unitIndex].rate_higher;
-        delete allUnits[unitIndex].rate_inter_higher;
-        
-        // Updated date (display date chosen by admin)
-        allUnits[unitIndex].updateDate = document.getElementById('edit-start-date').value || new Date().toISOString().split('T')[0];
-        
-        localStorage.setItem('moph_rates_db', JSON.stringify(allUnits));
-        alert('บันทึกข้อมูลเรียบร้อยแล้ว!');
-        renderTable();
-        updateStats();
-    }
-}
-
-function exportToFile() {
-    const dataStr = 'const initialData = ' + JSON.stringify(allUnits, null, 2) + ';';
-    const blob = new Blob([dataStr], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'data.js';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-function importFromFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            let content = e.target.result;
-            let data;
-            
-            // Handle both .js (with const initialData =) and pure .json
-            if (content.includes('const initialData =')) {
-                const jsonString = content.split('const initialData =')[1].trim().replace(/;$/, '');
-                data = JSON.parse(jsonString);
-            } else {
-                data = JSON.parse(content);
-            }
-
-            if (Array.isArray(data)) {
-                allUnits = data;
-                localStorage.setItem('moph_rates_db', JSON.stringify(allUnits));
-                alert('📥 กู้คืนข้อมูลสำเร็จ! (' + data.length + ' รายการ)');
-                
-                // Refresh UI
-                if (document.getElementById('total-units')) {
-                    updateStats();
-                    initProvinceCards();
-                    renderTable();
-                }
-                
-                // Reset file input for next use
-                event.target.value = '';
-            } else {
-                throw new Error('รูปแบบไฟล์ไม่ถูกต้อง');
-            }
-        } catch (err) {
-            console.error('Import error:', err);
-            alert('❌ ไม่สามารถกู้คืนข้อมูลได้: ตรวจสอบว่าเป็นไฟล์ที่ส่งออกจากระบบนี้เท่านั้น');
-        }
-    };
-    reader.readAsText(file);
 }
